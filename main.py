@@ -149,7 +149,8 @@ def main(params_path="../parameter/parameters_sorted.csv",
                                        param_data, param_data_scaled,
                                        param_names, "1.5GHz", output_dir,
                                        available_models_1p5g, train_sizes,
-                                       predict_mode, param_file)
+                                       predict_mode, param_file,
+                                       latent_dims, model_types, ae_epochs)
             except Exception as e:
                 print(f"处理1.5GHz数据时发生错误: {e}")
                 import traceback
@@ -168,7 +169,8 @@ def main(params_path="../parameter/parameters_sorted.csv",
 
                 print("\n开始分析3GHz RCS数据...")
                 analyze_frequency_data(rcs_data_3g_db, theta_values, phi_values, param_data, param_data_scaled,
-                                       param_names, "3GHz", output_dir, available_models_3g, train_sizes, predict_mode, param_file)
+                                       param_names, "3GHz", output_dir, available_models_3g, train_sizes, predict_mode, param_file,
+                                       latent_dims, model_types, ae_epochs)
             except Exception as e:
                 print(f"处理3GHz数据时发生错误: {e}")
                 import traceback
@@ -189,7 +191,8 @@ def main(params_path="../parameter/parameters_sorted.csv",
 
 def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param_data_scaled,
                            param_names, freq_label, output_dir, available_models=None,
-                           train_sizes=[90], predict_mode=False, param_file=None):
+                           train_sizes=[90], predict_mode=False, param_file=None,
+                           latent_dims=[5, 10, 15, 20], model_types=['standard', 'vae'], ae_epochs=200):
     """
     分析特定频率下的RCS数据 - 增强版
 
