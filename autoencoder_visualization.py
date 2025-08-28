@@ -276,6 +276,12 @@ def generate_comparison_analysis(results, output_dir):
     valid_train_mask = ~np.isnan(final_train_losses)
     valid_val_mask = ~np.isnan(final_val_losses)
     
+    # 调试输出
+    print(f"训练损失数据: {final_train_losses}")
+    print(f"验证损失数据: {final_val_losses}")
+    print(f"有效训练数据掩码: {valid_train_mask}")
+    print(f"有效验证数据掩码: {valid_val_mask}")
+    
     if np.any(valid_train_mask):
         plt.bar(np.array(x_pos)[valid_train_mask], np.array(final_train_losses)[valid_train_mask], 
                 alpha=0.7, label='最终训练损失', color='blue')

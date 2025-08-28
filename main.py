@@ -52,6 +52,16 @@ except ImportError as e:
         return
 
 
+# Windows编码设置
+import sys
+if sys.platform.startswith('win'):
+    try:
+        # 尝试设置UTF-8输出
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        pass
+
 # 在plt.figure()之前添加以下代码设置中文字体
 import matplotlib as mpl
 mpl.rcParams['font.sans-serif'] = ['SimHei']  # 设置使用黑体
@@ -176,7 +186,7 @@ def main(params_path="../parameter/parameters_sorted.csv",
 
 def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param_data_scaled,
                            param_names, freq_label, output_dir, available_models=None,
-                           train_sizes=[80], predict_mode=False, param_file=None):
+                           train_sizes=[90], predict_mode=False, param_file=None):
     """
     分析特定频率下的RCS数据 - 增强版
 
@@ -502,6 +512,15 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                     if autoencoder_results:
                         print("\n开始POD vs Autoencoder对比分析...")
                         compare_with_pod_results(autoencoder_results, pod_results, train_dir)
+                        
+                        # 尝试进行增强版对比分析
+                        try:
+                            from enhanced_comparison import enhanced_compare_with_pod_results
+                            print("\n开始增强版综合对比分析...")
+                            enhanced_compare_with_pod_results(autoencoder_results, pod_results, train_dir, train_dir)
+                        except Exception as enhanced_error:
+                            print(f"增强版对比分析失败: {enhanced_error}")
+                        
                         print("Autoencoder分析完成！")
                     else:
                         print("Autoencoder分析未产生有效结果")

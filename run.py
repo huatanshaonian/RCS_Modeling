@@ -1,12 +1,24 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 """
 运行脚本：提供简单的命令行界面，用于执行RCS的POD分析
 """
 
 import os
+import sys
 import argparse
 import time
 from main import main
+
+# Windows编码设置
+if sys.platform.startswith('win'):
+    import locale
+    try:
+        # 尝试设置UTF-8输出
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        pass
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="RCS数据的POD和模态分析")
