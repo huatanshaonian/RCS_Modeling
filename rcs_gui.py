@@ -435,6 +435,14 @@ class RCS_GUI:
         if self.basic_vars['predict_mode'].get() and self.basic_vars['param_file'].get():
             cmd.extend(["--param_file", self.basic_vars['param_file'].get()])
         
+        # 添加自编码器参数
+        if self.ae_vars['latent_dims'].get():
+            cmd.extend(["--latent_dims", self.ae_vars['latent_dims'].get()])
+        if self.ae_vars['model_types'].get():
+            cmd.extend(["--model_types", self.ae_vars['model_types'].get()])
+        if self.ae_vars['epochs'].get():
+            cmd.extend(["--ae_epochs", self.ae_vars['epochs'].get()])
+        
         return cmd
     
     def show_command(self):

@@ -22,33 +22,33 @@ try:
 
         pytorch_info = check_pytorch_availability()
         AUTOENCODER_AVAILABLE = pytorch_info['pytorch']
-        print("✅ 使用新的模块化自编码器结构")
+        print("使用新的模块化自编码器结构")
 
     except (ImportError, AttributeError):
         # 方案2：回退到原始的autoencoder_analysis模块
         from autoencoder_analysis import perform_autoencoder_analysis, compare_with_pod_results, PYTORCH_AVAILABLE
 
         AUTOENCODER_AVAILABLE = PYTORCH_AVAILABLE
-        print("✅ 使用原始的autoencoder_analysis模块")
+        print("使用原始的autoencoder_analysis模块")
 
     if AUTOENCODER_AVAILABLE:
-        print(f"🔥 PyTorch功能可用")
+        print("PyTorch功能可用")
     else:
-        print("❌ PyTorch功能不可用")
+        print("PyTorch功能不可用")
 
 except ImportError as e:
-    print(f"⚠️ 自编码器导入失败: {e}")
+    print(f"自编码器导入失败: {e}")
     AUTOENCODER_AVAILABLE = False
 
 
     # 创建fallback函数
     def perform_autoencoder_analysis(*args, **kwargs):
-        print("❌ 自编码器功能不可用，请检查PyTorch安装")
+        print("自编码器功能不可用，请检查PyTorch安装")
         return {}
 
 
     def compare_with_pod_results(*args, **kwargs):
-        print("❌ 自编码器对比功能不可用")
+        print("自编码器对比功能不可用")
         return
 
 
@@ -75,7 +75,10 @@ def main(params_path="../parameter/parameters_sorted.csv",
          num_models=100,
          num_train = "70,80",
          predict_mode = False,
-         param_file = None
+         param_file = None,
+         latent_dims = [5, 10, 15, 20],
+         model_types = ['standard', 'vae'],
+         ae_epochs = 200
          ):
     """
     主程序，控制整个分析流程
@@ -503,8 +506,8 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                         output_dir=train_dir,
                         train_indices=train_indices,
                         test_indices=test_indices if len(test_indices) > 0 else None,
-                        latent_dims=[5, 10, 15, 20],  # 可根据需要调整
-                        model_types=['standard', 'vae'],
+                        latent_dims=latent_dims,  # 使用传入的参数
+                        model_types=model_types,  # 使用传入的参数
                         device='auto'  # 自动选择最佳设备
                     )
 

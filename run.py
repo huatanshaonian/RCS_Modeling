@@ -47,6 +47,16 @@ if __name__ == "__main__":
     parser.add_argument("--param_file", type=str, default=None,
                         help="预测模式下的设计参数文件路径")
 
+    # 自编码器相关参数
+    parser.add_argument("--latent_dims", type=str, default="5,10,15,20",
+                        help="自编码器潜在空间维度,用逗号分隔(如'5,10,15,20')")
+    
+    parser.add_argument("--model_types", type=str, default="standard,vae",
+                        help="自编码器模型类型,用逗号分隔(如'standard,vae')")
+    
+    parser.add_argument("--ae_epochs", type=int, default=200,
+                        help="自编码器训练轮数")
+
     args = parser.parse_args()
 
     # 确保输出目录存在
@@ -55,12 +65,19 @@ if __name__ == "__main__":
     # 记录开始时间
     start_time = time.time()
 
+    # 解析自编码器参数
+    latent_dims = [int(x.strip()) for x in args.latent_dims.split(',') if x.strip()]
+    model_types = [x.strip() for x in args.model_types.split(',') if x.strip()]
+
     print(f"开始RCS数据的POD和模态分析...")
     print(f"参数文件: {args.params_path}")
     print(f"RCS数据目录: {args.rcs_dir}")
     print(f"分析频率: {args.freq}")
     print(f"模型数量: {args.num_models}")
     print(f"输出目录: {args.output_dir}")
+    print(f"自编码器潜在维度: {latent_dims}")
+    print(f"自编码器模型类型: {model_types}")
+    print(f"自编码器训练轮数: {args.ae_epochs}")
     print("-" * 50)
 
     # 执行主程序
@@ -69,9 +86,12 @@ if __name__ == "__main__":
          output_dir=args.output_dir,
          analyze_freq=args.freq,
          num_models=args.num_models,
-         num_train=args.num_train,  # 添加这个参数
-         predict_mode=args.predict_mode,  # 添加这个参数
-         param_file=args.param_file)  # 添加这个参数
+         num_train=args.num_train,
+         predict_mode=args.predict_mode,
+         param_file=args.param_file,
+         latent_dims=latent_dims,    # 添加自编码器参数
+         model_types=model_types,    # 添加自编码器参数
+         ae_epochs=args.ae_epochs)   # 添加自编码器参数
 
     # 计算运行时间
     elapsed_time = time.time() - start_time
