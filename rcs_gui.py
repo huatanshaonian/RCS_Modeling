@@ -202,6 +202,14 @@ class RCS_GUI:
         ttk.Label(pod_frame, text="可视化模态数量:").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.pod_vars['num_modes_visualize'] = tk.StringVar(value="10")
         ttk.Entry(pod_frame, textvariable=self.pod_vars['num_modes_visualize'], width=40).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
+        
+        row += 1
+        ttk.Label(pod_frame, text="POD重建模态数:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        self.pod_vars['pod_reconstruct_num'] = tk.StringVar(value="0")
+        pod_recon_frame = ttk.Frame(pod_frame)
+        pod_recon_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
+        ttk.Entry(pod_recon_frame, textvariable=self.pod_vars['pod_reconstruct_num'], width=10).pack(side=tk.LEFT)
+        ttk.Label(pod_recon_frame, text="(0表示使用能量阈值自动确定)", foreground="gray").pack(side=tk.LEFT, padx=(5, 0))
         row += 1
         
         # 添加说明
@@ -458,6 +466,8 @@ class RCS_GUI:
             cmd.extend(["--energy_threshold", self.pod_vars['energy_threshold'].get()])
         if self.pod_vars['num_modes_visualize'].get():
             cmd.extend(["--num_modes_visualize", self.pod_vars['num_modes_visualize'].get()])
+        if self.pod_vars['pod_reconstruct_num'].get():
+            cmd.extend(["--pod_reconstruct_num", self.pod_vars['pod_reconstruct_num'].get()])
         
         return cmd
     

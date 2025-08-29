@@ -271,18 +271,20 @@ def compute_pod_coeffs(data, phi_modes, mean_data):
     return pod_coeffs
 
 
-def energy_analysis(lambda_values, output_dir):
+def energy_analysis(lambda_values, output_dir, energy_threshold=95.0):
     """
     分析模态能量分布 - 增强版，添加错误处理和内存管理
 
     参数:
     lambda_values: 特征值（能量），形状为 [num_models]
     output_dir: 输出目录
+    energy_threshold: 能量覆盖阈值百分比
 
     返回:
     modes_90: 捕获90%能量需要的模态数
     modes_95: 捕获95%能量需要的模态数
     modes_99: 捕获99%能量需要的模态数
+    modes_threshold: 捕获指定阈值能量需要的模态数
     """
     try:
         print("开始能量分析...")
@@ -294,7 +296,7 @@ def energy_analysis(lambda_values, output_dir):
         # 检查输入数据
         if len(lambda_values) == 0:
             print("警告: 空的特征值数组")
-            return 1, 1, 1
+            return 1, 1, 1, 1
 
         # 检查并处理负值或NaN
         if np.any(np.isnan(lambda_values)) or np.any(np.isinf(lambda_values)):
@@ -319,7 +321,7 @@ def energy_analysis(lambda_values, output_dir):
 
         if total_energy <= 1e-10:  # 使用更安全的比较
             print("警告: 总能量接近零")
-            return 1, 1, 1
+            return 1, 1, 1, 1
 
         energy = lambda_values / total_energy
         print(f"能量比例前5个: {energy[:min(5, len(energy))]}")
@@ -327,7 +329,7 @@ def energy_analysis(lambda_values, output_dir):
         # 检查能量比例
         if np.any(np.isnan(energy)) or np.any(np.isinf(energy)):
             print("警告: 能量比例计算出现NaN或Inf，使用默认值")
-            return 1, 1, 1
+            return 1, 1, 1, 1
 
         cumulative_energy = np.cumsum(energy)
         print(f"累积能量前5个: {cumulative_energy[:min(5, len(cumulative_energy))]}")
@@ -348,7 +350,15 @@ def energy_analysis(lambda_values, output_dir):
         else:
             modes_99 = max_modes
 
+        # 计算用户指定阈值对应的模态数
+        threshold_ratio = energy_threshold / 100.0
+        if np.any(cumulative_energy >= threshold_ratio):
+            modes_threshold = np.argmax(cumulative_energy >= threshold_ratio) + 1
+        else:
+            modes_threshold = max_modes
+
         print(f"初步计算的模态数: 90%={modes_90}, 95%={modes_95}, 99%={modes_99}")
+        print(f"用户指定{energy_threshold}%阈值对应的模态数: {modes_threshold}")
 
         try:
             # 可视化能量分布 - 单独的try块，防止图形问题影响主逻辑
@@ -405,7 +415,7 @@ def energy_analysis(lambda_values, output_dir):
         print(f"捕获95%能量需要的模态数: {modes_95}")
         print(f"捕获99%能量需要的模态数: {modes_99}")
 
-        return modes_90, modes_95, modes_99
+        return modes_90, modes_95, modes_99, modes_threshold
 
     except Exception as e:
         print(f"能量分析过程中发生错误: {e}")
@@ -413,4 +423,5 @@ def energy_analysis(lambda_values, output_dir):
         traceback.print_exc()
 
         # 返回默认值
-        return 5, 10, 20  # 返回默认模态数量
+        default_threshold = max(5, int(energy_threshold * 15 / 95))  # 基于阈值估算
+        return 5, 10, 20, default_threshold  # 返回默认模态数量

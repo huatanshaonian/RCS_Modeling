@@ -72,6 +72,9 @@ if __name__ == "__main__":
     
     parser.add_argument("--num_modes_visualize", type=int, default=10,
                         help="可视化的POD模态数量")
+    
+    parser.add_argument("--pod_reconstruct_num", type=int, default=0,
+                        help="POD重建使用的模态数量(0表示使用能量阈值确定)")
 
     args = parser.parse_args()
 
@@ -99,6 +102,7 @@ if __name__ == "__main__":
     print(f"自编码器批次大小: {args.ae_batch_size if args.ae_batch_size > 0 else '自动'}")
     print(f"POD能量阈值: {args.energy_threshold}%")
     print(f"可视化模态数量: {args.num_modes_visualize}")
+    print(f"POD重建模态数: {args.pod_reconstruct_num if args.pod_reconstruct_num > 0 else '使用能量阈值确定'}")
     print("-" * 50)
 
     # 执行主程序
@@ -117,7 +121,8 @@ if __name__ == "__main__":
          ae_learning_rate=args.ae_learning_rate,
          ae_batch_size=args.ae_batch_size,
          energy_threshold=args.energy_threshold,
-         num_modes_visualize=args.num_modes_visualize)
+         num_modes_visualize=args.num_modes_visualize,
+         pod_reconstruct_num=args.pod_reconstruct_num)
 
     # 计算运行时间
     elapsed_time = time.time() - start_time

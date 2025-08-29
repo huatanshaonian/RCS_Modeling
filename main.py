@@ -83,7 +83,8 @@ def main(params_path="../parameter/parameters_sorted.csv",
          ae_learning_rate = 0.001,
          ae_batch_size = 0,
          energy_threshold = 95.0,
-         num_modes_visualize = 10
+         num_modes_visualize = 10,
+         pod_reconstruct_num = 0
          ):
     """
     主程序，控制整个分析流程
@@ -157,7 +158,7 @@ def main(params_path="../parameter/parameters_sorted.csv",
                                        predict_mode, param_file,
                                        latent_dims, model_types, ae_epochs,
                                        ae_device, ae_learning_rate, ae_batch_size,
-                                       energy_threshold, num_modes_visualize)
+                                       energy_threshold, num_modes_visualize, pod_reconstruct_num)
             except Exception as e:
                 print(f"处理1.5GHz数据时发生错误: {e}")
                 import traceback
@@ -179,7 +180,7 @@ def main(params_path="../parameter/parameters_sorted.csv",
                                        param_names, "3GHz", output_dir, available_models_3g, train_sizes, predict_mode, param_file,
                                        latent_dims, model_types, ae_epochs,
                                        ae_device, ae_learning_rate, ae_batch_size,
-                                       energy_threshold, num_modes_visualize)
+                                       energy_threshold, num_modes_visualize, pod_reconstruct_num)
             except Exception as e:
                 print(f"处理3GHz数据时发生错误: {e}")
                 import traceback
@@ -203,7 +204,7 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                            train_sizes=[90], predict_mode=False, param_file=None,
                            latent_dims=[5, 10, 15, 20], model_types=['standard', 'vae'], ae_epochs=200,
                            ae_device='auto', ae_learning_rate=0.001, ae_batch_size=0,
-                           energy_threshold=95.0, num_modes_visualize=10):
+                           energy_threshold=95.0, num_modes_visualize=10, pod_reconstruct_num=0):
     """
     分析特定频率下的RCS数据 - 增强版
 
@@ -371,11 +372,20 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
 
                 # 能量分析
                 print("进行能量分析...")
-                modes_90, modes_95, modes_99 = energy_analysis(lambda_values_train, train_dir)
+                modes_90, modes_95, modes_99, modes_threshold = energy_analysis(lambda_values_train, train_dir, energy_threshold)
 
-                # 选择保留模态数量（这里选择95%能量）
-                r = max(1, min(modes_95, phi_modes_train.shape[1] - 1))  # 确保至少保留1个模态，且不超出范围
-                print(f"选择保留前 {r} 个模态，覆盖95%能量")
+                # 选择保留模态数量（使用用户指定的能量阈值）
+                r_energy = max(1, min(modes_threshold, phi_modes_train.shape[1] - 1))  # 能量阈值确定的模态数
+                r_manual = pod_reconstruct_num if pod_reconstruct_num > 0 else r_energy  # 手动指定或能量阈值
+                r_manual = max(1, min(r_manual, phi_modes_train.shape[1] - 1))  # 确保范围有效
+                
+                print(f"能量阈值{energy_threshold}%确定的模态数: {r_energy}")
+                if pod_reconstruct_num > 0:
+                    print(f"用户指定重建模态数: {r_manual}")
+                    r = r_manual
+                else:
+                    print(f"使用能量阈值确定的模态数进行重建: {r_energy}")
+                    r = r_energy
 
                 # 保存POD结果
                 np.save(os.path.join(train_dir, "pod_modes.npy"), phi_modes_train)
@@ -555,6 +565,141 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                 traceback.print_exc()
                 print("Autoencoder分析失败，继续执行其他分析...")
             # ===== Autoencoder分析结束 =====
+            
+            # ===== 重建方法性能对比分析 =====
+            try:
+                print("\n" + "=" * 60)
+                print("重建方法性能对比分析")
+                print("=" * 60)
+                
+                # 创建对比分析目录
+                comparison_dir = os.path.join(train_dir, "reconstruction_comparison")
+                os.makedirs(comparison_dir, exist_ok=True)
+                
+                # POD重建性能对比
+                from calculatercs import calculate_statistics_from_data
+                
+                reconstruction_results = {}
+                
+                # 1. 能量阈值确定的POD重建
+                if r_energy > 0 and r_energy <= phi_modes_train.shape[1]:
+                    pod_coeffs_energy = compute_pod_coeffs(rcs_data_train - mean_rcs_train.reshape(1, -1), 
+                                                         phi_modes_train[:, :r_energy])
+                    rcs_recon_energy = np.dot(pod_coeffs_energy, phi_modes_train[:, :r_energy].T) + mean_rcs_train
+                    
+                    # 计算重建性能
+                    r2_energy = 1 - np.sum((rcs_data_train - rcs_recon_energy)**2) / np.sum((rcs_data_train - np.mean(rcs_data_train))**2)
+                    mse_energy = np.mean((rcs_data_train - rcs_recon_energy)**2)
+                    
+                    reconstruction_results[f'POD_Energy_{energy_threshold}%'] = {
+                        'method': f'POD能量阈值({energy_threshold}%)',
+                        'modes': r_energy,
+                        'r2': r2_energy,
+                        'mse': mse_energy,
+                        'reconstruction': rcs_recon_energy
+                    }
+                    print(f"POD能量阈值重建({r_energy}个模态): R²={r2_energy:.4f}, MSE={mse_energy:.6f}")
+                
+                # 2. 手动指定模态数的POD重建(如果不同于能量阈值)
+                if pod_reconstruct_num > 0 and pod_reconstruct_num != r_energy:
+                    r_manual_actual = max(1, min(pod_reconstruct_num, phi_modes_train.shape[1]))
+                    pod_coeffs_manual = compute_pod_coeffs(rcs_data_train - mean_rcs_train.reshape(1, -1), 
+                                                         phi_modes_train[:, :r_manual_actual])
+                    rcs_recon_manual = np.dot(pod_coeffs_manual, phi_modes_train[:, :r_manual_actual].T) + mean_rcs_train
+                    
+                    r2_manual = 1 - np.sum((rcs_data_train - rcs_recon_manual)**2) / np.sum((rcs_data_train - np.mean(rcs_data_train))**2)
+                    mse_manual = np.mean((rcs_data_train - rcs_recon_manual)**2)
+                    
+                    reconstruction_results[f'POD_Manual_{r_manual_actual}'] = {
+                        'method': f'POD手动指定({r_manual_actual}个模态)',
+                        'modes': r_manual_actual,
+                        'r2': r2_manual,
+                        'mse': mse_manual,
+                        'reconstruction': rcs_recon_manual
+                    }
+                    print(f"POD手动指定重建({r_manual_actual}个模态): R²={r2_manual:.4f}, MSE={mse_manual:.6f}")
+                
+                # 3. 添加自编码器结果（如果可用）
+                if 'autoencoder_results' in locals() and autoencoder_results:
+                    for config_name, ae_result in autoencoder_results.items():
+                        if 'mse' in ae_result and 'r2' in ae_result:
+                            reconstruction_results[f'AE_{config_name}'] = {
+                                'method': f'自编码器 {config_name}',
+                                'modes': ae_result.get('latent_dim', 'N/A'),
+                                'r2': ae_result['r2'],
+                                'mse': ae_result['mse'],
+                                'model_type': ae_result.get('model_type', 'unknown')
+                            }
+                            print(f"自编码器{config_name}: R²={ae_result['r2']:.4f}, MSE={ae_result['mse']:.6f}")
+                
+                # 生成对比图表
+                if reconstruction_results:
+                    import matplotlib.pyplot as plt
+                    
+                    methods = list(reconstruction_results.keys())
+                    r2_scores = [reconstruction_results[m]['r2'] for m in methods]
+                    mse_scores = [reconstruction_results[m]['mse'] for m in methods]
+                    
+                    # R²对比图
+                    plt.figure(figsize=(12, 8))
+                    
+                    plt.subplot(2, 1, 1)
+                    bars1 = plt.bar(range(len(methods)), r2_scores, alpha=0.7)
+                    plt.xlabel('重建方法')
+                    plt.ylabel('R^2 分数')
+                    plt.title(f'{freq_label} 重建方法性能对比 - R^2')
+                    plt.xticks(range(len(methods)), [reconstruction_results[m]['method'] for m in methods], 
+                              rotation=45, ha='right')
+                    plt.grid(True, alpha=0.3)
+                    
+                    # 在柱子上标注数值
+                    for i, v in enumerate(r2_scores):
+                        plt.text(i, v + 0.01, f'{v:.3f}', ha='center', va='bottom')
+                    
+                    # MSE对比图
+                    plt.subplot(2, 1, 2)
+                    bars2 = plt.bar(range(len(methods)), mse_scores, alpha=0.7, color='orange')
+                    plt.xlabel('重建方法')
+                    plt.ylabel('均方误差 (MSE)')
+                    plt.title(f'{freq_label} 重建方法性能对比 - MSE')
+                    plt.xticks(range(len(methods)), [reconstruction_results[m]['method'] for m in methods], 
+                              rotation=45, ha='right')
+                    plt.grid(True, alpha=0.3)
+                    
+                    # 在柱子上标注数值
+                    for i, v in enumerate(mse_scores):
+                        plt.text(i, v + max(mse_scores)*0.02, f'{v:.4f}', ha='center', va='bottom')
+                    
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(comparison_dir, 'reconstruction_methods_comparison.png'), 
+                               dpi=150, bbox_inches='tight')
+                    plt.close()
+                    
+                    # 保存详细结果到CSV
+                    import pandas as pd
+                    comparison_data = []
+                    for method_key, result in reconstruction_results.items():
+                        comparison_data.append({
+                            '方法': result['method'],
+                            '模态数/潜在维度': result['modes'],
+                            'R^2': result['r2'],
+                            'MSE': result['mse'],
+                            '方法类型': 'POD' if method_key.startswith('POD') else '自编码器'
+                        })
+                    
+                    comparison_df = pd.DataFrame(comparison_data)
+                    comparison_df.to_csv(os.path.join(comparison_dir, 'reconstruction_comparison.csv'), 
+                                       index=False, encoding='utf-8-sig')
+                    
+                    print(f"\n重建方法对比完成！结果保存在: {comparison_dir}")
+                    print("详细结果:")
+                    print(comparison_df.to_string(index=False))
+                
+            except Exception as e:
+                print(f"\n重建方法对比分析失败: {e}")
+                import traceback
+                traceback.print_exc()
+            # ===== 重建方法性能对比结束 =====
 
             # 测试集上的预测和分析
             if len(test_indices) > 0:
