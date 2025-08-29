@@ -634,7 +634,6 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                 
                 # 生成对比图表
                 if reconstruction_results:
-                    import matplotlib.pyplot as plt
                     
                     methods = list(reconstruction_results.keys())
                     r2_scores = [reconstruction_results[m]['r2'] for m in methods]
