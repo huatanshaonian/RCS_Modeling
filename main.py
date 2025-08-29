@@ -676,7 +676,6 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                     plt.close()
                     
                     # 保存详细结果到CSV
-                    import pandas as pd
                     comparison_data = []
                     for method_key, result in reconstruction_results.items():
                         comparison_data.append({
