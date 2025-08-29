@@ -78,7 +78,12 @@ def main(params_path="../parameter/parameters_sorted.csv",
          param_file = None,
          latent_dims = [5, 10, 15, 20],
          model_types = ['standard', 'vae'],
-         ae_epochs = 200
+         ae_epochs = 200,
+         ae_device = 'auto',
+         ae_learning_rate = 0.001,
+         ae_batch_size = 0,
+         energy_threshold = 95.0,
+         num_modes_visualize = 10
          ):
     """
     主程序，控制整个分析流程
@@ -150,7 +155,9 @@ def main(params_path="../parameter/parameters_sorted.csv",
                                        param_names, "1.5GHz", output_dir,
                                        available_models_1p5g, train_sizes,
                                        predict_mode, param_file,
-                                       latent_dims, model_types, ae_epochs)
+                                       latent_dims, model_types, ae_epochs,
+                                       ae_device, ae_learning_rate, ae_batch_size,
+                                       energy_threshold, num_modes_visualize)
             except Exception as e:
                 print(f"处理1.5GHz数据时发生错误: {e}")
                 import traceback
@@ -170,7 +177,9 @@ def main(params_path="../parameter/parameters_sorted.csv",
                 print("\n开始分析3GHz RCS数据...")
                 analyze_frequency_data(rcs_data_3g_db, theta_values, phi_values, param_data, param_data_scaled,
                                        param_names, "3GHz", output_dir, available_models_3g, train_sizes, predict_mode, param_file,
-                                       latent_dims, model_types, ae_epochs)
+                                       latent_dims, model_types, ae_epochs,
+                                       ae_device, ae_learning_rate, ae_batch_size,
+                                       energy_threshold, num_modes_visualize)
             except Exception as e:
                 print(f"处理3GHz数据时发生错误: {e}")
                 import traceback
@@ -192,7 +201,9 @@ def main(params_path="../parameter/parameters_sorted.csv",
 def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param_data_scaled,
                            param_names, freq_label, output_dir, available_models=None,
                            train_sizes=[90], predict_mode=False, param_file=None,
-                           latent_dims=[5, 10, 15, 20], model_types=['standard', 'vae'], ae_epochs=200):
+                           latent_dims=[5, 10, 15, 20], model_types=['standard', 'vae'], ae_epochs=200,
+                           ae_device='auto', ae_learning_rate=0.001, ae_batch_size=0,
+                           energy_threshold=95.0, num_modes_visualize=10):
     """
     分析特定频率下的RCS数据 - 增强版
 
@@ -511,7 +522,7 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                         test_indices=test_indices if len(test_indices) > 0 else None,
                         latent_dims=latent_dims,  # 使用传入的参数
                         model_types=model_types,  # 使用传入的参数
-                        device='auto'  # 自动选择最佳设备
+                        device=ae_device  # 使用传入的设备参数
                     )
 
                     # 与POD结果对比

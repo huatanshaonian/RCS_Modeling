@@ -442,6 +442,22 @@ class RCS_GUI:
             cmd.extend(["--model_types", self.ae_vars['model_types'].get()])
         if self.ae_vars['epochs'].get():
             cmd.extend(["--ae_epochs", self.ae_vars['epochs'].get()])
+        if self.ae_vars['device'].get():
+            cmd.extend(["--ae_device", self.ae_vars['device'].get()])
+        if self.ae_vars['learning_rate'].get():
+            cmd.extend(["--ae_learning_rate", self.ae_vars['learning_rate'].get()])
+        
+        # 处理批次大小
+        if self.ae_vars['batch_size_mode'].get() == "manual" and self.ae_vars['batch_size'].get():
+            cmd.extend(["--ae_batch_size", self.ae_vars['batch_size'].get()])
+        else:
+            cmd.extend(["--ae_batch_size", "0"])  # 0表示自动
+        
+        # 添加POD参数
+        if self.pod_vars['energy_threshold'].get():
+            cmd.extend(["--energy_threshold", self.pod_vars['energy_threshold'].get()])
+        if self.pod_vars['num_modes_visualize'].get():
+            cmd.extend(["--num_modes_visualize", self.pod_vars['num_modes_visualize'].get()])
         
         return cmd
     

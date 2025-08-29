@@ -56,6 +56,22 @@ if __name__ == "__main__":
     
     parser.add_argument("--ae_epochs", type=int, default=200,
                         help="自编码器训练轮数")
+    
+    parser.add_argument("--ae_device", type=str, default="auto",
+                        help="自编码器计算设备(auto,cpu,cuda)")
+    
+    parser.add_argument("--ae_learning_rate", type=float, default=0.001,
+                        help="自编码器学习率")
+    
+    parser.add_argument("--ae_batch_size", type=int, default=0,
+                        help="自编码器批次大小(0表示自动)")
+
+    # POD相关参数
+    parser.add_argument("--energy_threshold", type=float, default=95.0,
+                        help="POD能量阈值百分比")
+    
+    parser.add_argument("--num_modes_visualize", type=int, default=10,
+                        help="可视化的POD模态数量")
 
     args = parser.parse_args()
 
@@ -78,6 +94,11 @@ if __name__ == "__main__":
     print(f"自编码器潜在维度: {latent_dims}")
     print(f"自编码器模型类型: {model_types}")
     print(f"自编码器训练轮数: {args.ae_epochs}")
+    print(f"自编码器计算设备: {args.ae_device}")
+    print(f"自编码器学习率: {args.ae_learning_rate}")
+    print(f"自编码器批次大小: {args.ae_batch_size if args.ae_batch_size > 0 else '自动'}")
+    print(f"POD能量阈值: {args.energy_threshold}%")
+    print(f"可视化模态数量: {args.num_modes_visualize}")
     print("-" * 50)
 
     # 执行主程序
@@ -89,9 +110,14 @@ if __name__ == "__main__":
          num_train=args.num_train,
          predict_mode=args.predict_mode,
          param_file=args.param_file,
-         latent_dims=latent_dims,    # 添加自编码器参数
-         model_types=model_types,    # 添加自编码器参数
-         ae_epochs=args.ae_epochs)   # 添加自编码器参数
+         latent_dims=latent_dims,
+         model_types=model_types,
+         ae_epochs=args.ae_epochs,
+         ae_device=args.ae_device,
+         ae_learning_rate=args.ae_learning_rate,
+         ae_batch_size=args.ae_batch_size,
+         energy_threshold=args.energy_threshold,
+         num_modes_visualize=args.num_modes_visualize)
 
     # 计算运行时间
     elapsed_time = time.time() - start_time
