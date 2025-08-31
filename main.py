@@ -84,7 +84,8 @@ def main(params_path="../parameter/parameters_sorted.csv",
          ae_batch_size = 0,
          energy_threshold = 95.0,
          num_modes_visualize = 10,
-         pod_reconstruct_num = 0
+         pod_reconstruct_num = 0,
+         pod_modes = [10, 20, 30, 40]
          ):
     """
     主程序，控制整个分析流程
@@ -446,8 +447,19 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                 recon_dir = os.path.join(train_dir, "reconstruction_train")
                 os.makedirs(recon_dir, exist_ok=True)
 
-                r_values = [min(5, r), min(10, r), r]
+                # 使用用户指定的POD模态数量列表
+                r_values = []
+                for pod_mode in pod_modes:
+                    if pod_mode <= r:  # 只使用不超过最大可用模态数的值
+                        r_values.append(pod_mode)
+                
+                # 如果没有有效的用户指定值，使用默认值
+                if not r_values:
+                    r_values = [min(5, r), min(10, r), r]
+                
                 r_values = sorted(list(set(r_values)))  # 去除重复值并排序
+                print(f"POD重建将使用以下模态数量: {r_values}")
+                
                 reconstruct_rcs(rcs_data_train, phi_modes_train, pod_coeffs_train, mean_rcs_train,
                                 r_values, theta_values, phi_values, recon_dir)
                 # 使用最优模态数量重构进行性能评估
@@ -459,6 +471,15 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                 pod_mse = mean_squared_error(rcs_data_train, reconstructed_train_optimal)
 
                 print(f"POD重构性能: R^2 = {pod_r2:.6f}, MSE = {pod_mse:.6f}")
+                
+                # 调试信息：检查数据范围
+                print(f"调试信息:")
+                print(f"  原始数据范围: [{np.min(rcs_data_train):.3f}, {np.max(rcs_data_train):.3f}]")
+                print(f"  重构数据范围: [{np.min(reconstructed_train_optimal):.3f}, {np.max(reconstructed_train_optimal):.3f}]")
+                print(f"  重构误差范围: [{np.min(rcs_data_train - reconstructed_train_optimal):.3f}, {np.max(rcs_data_train - reconstructed_train_optimal):.3f}]")
+                print(f"  使用模态数: {r}")
+                print(f"  POD系数形状: {pod_coeffs_train.shape}")
+                print(f"  模态矩阵形状: {phi_modes_train[:, :r].shape}")
 
                 # 保存POD性能指标供后续使用
                 pod_performance = {
@@ -466,8 +487,33 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                     'mse': pod_mse,
                     'n_modes': r,
                     'pod_coeffs': pod_coeffs_train,
-                    'reconstruction_error': np.mean((rcs_data_train - reconstructed_train_optimal) ** 2, axis=1)
+                    'reconstruction_error': np.mean((rcs_data_train - reconstructed_train_optimal) ** 2, axis=1),
+                    # 为增强对比分析添加兼容的键名
+                    'reconstruction_r2': pod_r2,
+                    'reconstruction_mse': pod_mse,
+                    'num_modes': r
                 }
+                
+                # 为多模态数量分析添加额外的性能数据
+                pod_performance['multi_mode_results'] = {}
+                for r_modes in r_values:
+                    if r_modes <= phi_modes_train.shape[1]:
+                        # 计算每个模态数量的性能
+                        pod_coeffs_mode = compute_pod_coeffs(rcs_data_train, 
+                                                           phi_modes_train[:, :r_modes],
+                                                           mean_rcs_train)
+                        rcs_recon_mode = np.dot(pod_coeffs_mode, phi_modes_train[:, :r_modes].T) + mean_rcs_train
+                        
+                        from sklearn.metrics import r2_score, mean_squared_error
+                        r2_mode = r2_score(rcs_data_train.flatten(), rcs_recon_mode.flatten())
+                        mse_mode = mean_squared_error(rcs_data_train, rcs_recon_mode)
+                        
+                        pod_performance['multi_mode_results'][f'{r_modes}_modes'] = {
+                            'reconstruction_r2': r2_mode,
+                            'reconstruction_mse': mse_mode,
+                            'num_modes': r_modes
+                        }
+                        print(f"多模态分析 - {r_modes}模态: R²={r2_mode:.4f}, MSE={mse_mode:.6f}")
 
                 # 计算训练集RCS统计数据
                 print("计算训练集RCS统计数据...")
@@ -583,8 +629,9 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                 
                 # 1. 能量阈值确定的POD重建
                 if r_energy > 0 and r_energy <= phi_modes_train.shape[1]:
-                    pod_coeffs_energy = compute_pod_coeffs(rcs_data_train - mean_rcs_train.reshape(1, -1), 
-                                                         phi_modes_train[:, :r_energy])
+                    pod_coeffs_energy = compute_pod_coeffs(rcs_data_train, 
+                                                         phi_modes_train[:, :r_energy],
+                                                         mean_rcs_train)
                     rcs_recon_energy = np.dot(pod_coeffs_energy, phi_modes_train[:, :r_energy].T) + mean_rcs_train
                     
                     # 计算重建性能
@@ -600,11 +647,34 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                     }
                     print(f"POD能量阈值重建({r_energy}个模态): R²={r2_energy:.4f}, MSE={mse_energy:.6f}")
                 
-                # 2. 手动指定模态数的POD重建(如果不同于能量阈值)
-                if pod_reconstruct_num > 0 and pod_reconstruct_num != r_energy:
+                # 2. 多个模态数量的POD重建对比
+                print(f"\n开始多模态数量POD重建对比，模态数量: {r_values}")
+                for r_modes in r_values:
+                    if r_modes <= phi_modes_train.shape[1] and r_modes != r_energy:  # 避免与能量阈值结果重复
+                        pod_coeffs_multi = compute_pod_coeffs(rcs_data_train, 
+                                                            phi_modes_train[:, :r_modes],
+                                                            mean_rcs_train)
+                        rcs_recon_multi = np.dot(pod_coeffs_multi, phi_modes_train[:, :r_modes].T) + mean_rcs_train
+                        
+                        # 计算重建性能
+                        r2_multi = 1 - np.sum((rcs_data_train - rcs_recon_multi)**2) / np.sum((rcs_data_train - np.mean(rcs_data_train))**2)
+                        mse_multi = np.mean((rcs_data_train - rcs_recon_multi)**2)
+                        
+                        reconstruction_results[f'POD_{r_modes}modes'] = {
+                            'method': f'POD模态{r_modes}',
+                            'modes': r_modes,
+                            'r2': r2_multi,
+                            'mse': mse_multi,
+                            'reconstruction': rcs_recon_multi
+                        }
+                        print(f"POD{r_modes}模态重建: R²={r2_multi:.4f}, MSE={mse_multi:.6f}")
+                
+                # 3. 手动指定模态数的POD重建(如果不在上述列表中)
+                if pod_reconstruct_num > 0 and pod_reconstruct_num not in r_values and pod_reconstruct_num != r_energy:
                     r_manual_actual = max(1, min(pod_reconstruct_num, phi_modes_train.shape[1]))
-                    pod_coeffs_manual = compute_pod_coeffs(rcs_data_train - mean_rcs_train.reshape(1, -1), 
-                                                         phi_modes_train[:, :r_manual_actual])
+                    pod_coeffs_manual = compute_pod_coeffs(rcs_data_train, 
+                                                         phi_modes_train[:, :r_manual_actual],
+                                                         mean_rcs_train)
                     rcs_recon_manual = np.dot(pod_coeffs_manual, phi_modes_train[:, :r_manual_actual].T) + mean_rcs_train
                     
                     r2_manual = 1 - np.sum((rcs_data_train - rcs_recon_manual)**2) / np.sum((rcs_data_train - np.mean(rcs_data_train))**2)
@@ -631,6 +701,28 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                                 'model_type': ae_result.get('model_type', 'unknown')
                             }
                             print(f"自编码器{config_name}: R²={ae_result['r2']:.4f}, MSE={ae_result['mse']:.6f}")
+                
+                # POD多模态数量专项分析
+                try:
+                    from pod_multi_mode_comparison import create_pod_multi_mode_comparison, analyze_pod_mode_trends
+                    pod_results_only = {k: v for k, v in reconstruction_results.items() if k.startswith('POD_') and 'modes' in k}
+                    
+                    if pod_results_only:
+                        print(f"\n开始POD多模态数量专项分析...")
+                        create_pod_multi_mode_comparison(pod_results_only, comparison_dir)
+                        
+                        # 进行趋势分析
+                        sorted_results = sorted(pod_results_only.items(), key=lambda x: x[1]['modes'])
+                        analysis = analyze_pod_mode_trends(sorted_results)
+                        
+                        print(f"\nPOD模态数量分析报告:")
+                        print(f"  测试模态数量范围: {analysis['mode_range'][0]}-{analysis['mode_range'][1]}")
+                        print(f"  最佳R²性能: {analysis['best_r2']:.4f} (使用{analysis['best_r2_mode']}个模态)")
+                        print(f"  最高效率点: {analysis['best_efficiency']:.4f} (使用{analysis['best_efficiency_mode']}个模态)")
+                        print(f"  建议最少模态数: {analysis['diminishing_returns_mode']} (收益递减点)")
+                        
+                except Exception as multi_mode_error:
+                    print(f"POD多模态分析失败: {multi_mode_error}")
                 
                 # 生成对比图表
                 if reconstruction_results:

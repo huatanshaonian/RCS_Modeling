@@ -47,6 +47,10 @@ if __name__ == "__main__":
     parser.add_argument("--param_file", type=str, default=None,
                         help="预测模式下的设计参数文件路径")
 
+    # POD分析相关参数
+    parser.add_argument("--pod_modes", type=str, default="10,20,30,40",
+                        help="POD模态数量列表,用逗号分隔(如'10,20,30,40')")
+
     # 自编码器相关参数
     parser.add_argument("--latent_dims", type=str, default="5,10,15,20",
                         help="自编码器潜在空间维度,用逗号分隔(如'5,10,15,20')")
@@ -87,6 +91,9 @@ if __name__ == "__main__":
     # 解析自编码器参数
     latent_dims = [int(x.strip()) for x in args.latent_dims.split(',') if x.strip()]
     model_types = [x.strip() for x in args.model_types.split(',') if x.strip()]
+    
+    # 解析POD模态数量参数
+    pod_modes = [int(x.strip()) for x in args.pod_modes.split(',') if x.strip()]
 
     print(f"开始RCS数据的POD和模态分析...")
     print(f"参数文件: {args.params_path}")
@@ -103,6 +110,7 @@ if __name__ == "__main__":
     print(f"POD能量阈值: {args.energy_threshold}%")
     print(f"可视化模态数量: {args.num_modes_visualize}")
     print(f"POD重建模态数: {args.pod_reconstruct_num if args.pod_reconstruct_num > 0 else '使用能量阈值确定'}")
+    print(f"POD多模态对比: {pod_modes}")
     print("-" * 50)
 
     # 执行主程序
@@ -122,7 +130,8 @@ if __name__ == "__main__":
          ae_batch_size=args.ae_batch_size,
          energy_threshold=args.energy_threshold,
          num_modes_visualize=args.num_modes_visualize,
-         pod_reconstruct_num=args.pod_reconstruct_num)
+         pod_reconstruct_num=args.pod_reconstruct_num,
+         pod_modes=pod_modes)
 
     # 计算运行时间
     elapsed_time = time.time() - start_time
