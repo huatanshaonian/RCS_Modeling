@@ -78,6 +78,7 @@ def main(params_path="../parameter/parameters_sorted.csv",
          param_file = None,
          latent_dims = [5, 10, 15, 20],
          model_types = ['standard', 'vae'],
+         skip_ae_training = False,
          ae_epochs = 200,
          ae_device = 'auto',
          ae_learning_rate = 0.001,
@@ -157,9 +158,11 @@ def main(params_path="../parameter/parameters_sorted.csv",
                                        param_names, "1.5GHz", output_dir,
                                        available_models_1p5g, train_sizes,
                                        predict_mode, param_file,
-                                       latent_dims, model_types, ae_epochs,
+                                       latent_dims, model_types, 
+                                       skip_ae_training, ae_epochs,
                                        ae_device, ae_learning_rate, ae_batch_size,
-                                       energy_threshold, num_modes_visualize, pod_reconstruct_num)
+                                       energy_threshold, num_modes_visualize, pod_reconstruct_num,
+                                       pod_modes)
             except Exception as e:
                 print(f"处理1.5GHz数据时发生错误: {e}")
                 import traceback
@@ -179,9 +182,9 @@ def main(params_path="../parameter/parameters_sorted.csv",
                 print("\n开始分析3GHz RCS数据...")
                 analyze_frequency_data(rcs_data_3g_db, theta_values, phi_values, param_data, param_data_scaled,
                                        param_names, "3GHz", output_dir, available_models_3g, train_sizes, predict_mode, param_file,
-                                       latent_dims, model_types, ae_epochs,
+                                       latent_dims, model_types, skip_ae_training, ae_epochs,
                                        ae_device, ae_learning_rate, ae_batch_size,
-                                       energy_threshold, num_modes_visualize, pod_reconstruct_num)
+                                       energy_threshold, num_modes_visualize, pod_reconstruct_num, pod_modes)
             except Exception as e:
                 print(f"处理3GHz数据时发生错误: {e}")
                 import traceback
@@ -203,9 +206,11 @@ def main(params_path="../parameter/parameters_sorted.csv",
 def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param_data_scaled,
                            param_names, freq_label, output_dir, available_models=None,
                            train_sizes=[90], predict_mode=False, param_file=None,
-                           latent_dims=[5, 10, 15, 20], model_types=['standard', 'vae'], ae_epochs=200,
+                           latent_dims=[5, 10, 15, 20], model_types=['standard', 'vae'], 
+                           skip_ae_training=False, ae_epochs=200,
                            ae_device='auto', ae_learning_rate=0.001, ae_batch_size=0,
-                           energy_threshold=95.0, num_modes_visualize=10, pod_reconstruct_num=0):
+                           energy_threshold=95.0, num_modes_visualize=10, pod_reconstruct_num=0,
+                           pod_modes=[10, 20, 30, 40]):
     """
     分析特定频率下的RCS数据 - 增强版
 
@@ -366,6 +371,19 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
             np.save(os.path.join(train_dir, "train_indices.npy"), train_indices)
             np.save(os.path.join(train_dir, "test_indices.npy"), test_indices)
 
+            # 初始化POD性能指标（防止后续引用错误）
+            pod_performance = {
+                'r2': 0.0,
+                'mse': float('inf'),
+                'n_modes': 0,
+                'pod_coeffs': None,
+                'reconstruction_error': None,
+                'reconstruction_r2': 0.0,
+                'reconstruction_mse': float('inf'),
+                'num_modes': 0,
+                'multi_mode_results': {}
+            }
+            
             # 执行POD分解(仅使用训练集)
             print("执行POD分解(仅使用训练集)...")
             try:
@@ -481,8 +499,8 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                 print(f"  POD系数形状: {pod_coeffs_train.shape}")
                 print(f"  模态矩阵形状: {phi_modes_train[:, :r].shape}")
 
-                # 保存POD性能指标供后续使用
-                pod_performance = {
+                # 更新POD性能指标供后续使用
+                pod_performance.update({
                     'r2': pod_r2,
                     'mse': pod_mse,
                     'n_modes': r,
@@ -492,7 +510,7 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                     'reconstruction_r2': pod_r2,
                     'reconstruction_mse': pod_mse,
                     'num_modes': r
-                }
+                })
                 
                 # 为多模态数量分析添加额外的性能数据
                 pod_performance['multi_mode_results'] = {}
@@ -578,7 +596,8 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                         test_indices=test_indices if len(test_indices) > 0 else None,
                         latent_dims=latent_dims,  # 使用传入的参数
                         model_types=model_types,  # 使用传入的参数
-                        device=ae_device  # 使用传入的设备参数
+                        device=ae_device,  # 使用传入的设备参数
+                        skip_training=skip_ae_training
                     )
 
                     # 与POD结果对比

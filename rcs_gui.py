@@ -293,6 +293,13 @@ class RCS_GUI:
         self.batch_size_entry.pack(side=tk.LEFT, padx=(5, 0))
         row += 1
         
+        # 跳过AE重训练选项
+        self.ae_vars['skip_training'] = tk.BooleanVar(value=False)
+        skip_ae_check = ttk.Checkbutton(ae_frame, text="跳过AE重训练，优先使用已有模型", 
+                                       variable=self.ae_vars['skip_training'])
+        skip_ae_check.grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=2)
+        row += 1
+        
         ae_frame.columnconfigure(1, weight=1)
     
     def create_training_params_tab(self):
@@ -460,6 +467,10 @@ class RCS_GUI:
             cmd.extend(["--ae_batch_size", self.ae_vars['batch_size'].get()])
         else:
             cmd.extend(["--ae_batch_size", "0"])  # 0表示自动
+        
+        # 跳过AE重训练选项
+        if self.ae_vars['skip_training'].get():
+            cmd.append("--skip_ae_training")
         
         # 添加POD参数
         if self.pod_vars['energy_threshold'].get():

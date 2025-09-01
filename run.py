@@ -58,6 +58,9 @@ if __name__ == "__main__":
     parser.add_argument("--model_types", type=str, default="standard,vae",
                         help="自编码器模型类型,用逗号分隔(如'standard,vae')")
     
+    parser.add_argument("--skip_ae_training", action="store_true",
+                        help="跳过Autoencoder重训练，优先使用已有模型")
+    
     parser.add_argument("--ae_epochs", type=int, default=200,
                         help="自编码器训练轮数")
     
@@ -124,6 +127,7 @@ if __name__ == "__main__":
          param_file=args.param_file,
          latent_dims=latent_dims,
          model_types=model_types,
+         skip_ae_training=args.skip_ae_training,
          ae_epochs=args.ae_epochs,
          ae_device=args.ae_device,
          ae_learning_rate=args.ae_learning_rate,
