@@ -174,20 +174,31 @@ def read_log_file_updates():
     
     new_logs = []
     try:
-        with open(st.session_state.log_file_path, 'r', encoding='utf-8', errors='ignore') as f:
-            # 从上次读取位置开始
-            f.seek(st.session_state.log_file_position)
-            new_content = f.read()
-            
-            if new_content:
-                # 更新文件位置
-                st.session_state.log_file_position = f.tell()
+        # 尝试多种编码方式读取文件
+        encodings = ['utf-8', 'gbk', 'gb2312', 'cp936']
+        
+        for encoding in encodings:
+            try:
+                with open(st.session_state.log_file_path, 'r', encoding=encoding, errors='replace') as f:
+                    # 从上次读取位置开始
+                    f.seek(st.session_state.log_file_position)
+                    new_content = f.read()
+                    
+                    if new_content:
+                        # 更新文件位置
+                        st.session_state.log_file_position = f.tell()
+                        
+                        # 按行分割新内容
+                        new_lines = new_content.strip().split('\n')
+                        for line in new_lines:
+                            clean_line = line.strip()
+                            if clean_line:  # 忽略空行
+                                new_logs.append(clean_line)
+                    break  # 成功读取，跳出编码循环
+                    
+            except (UnicodeDecodeError, UnicodeError):
+                continue  # 尝试下一个编码
                 
-                # 按行分割新内容
-                new_lines = new_content.strip().split('\n')
-                for line in new_lines:
-                    if line.strip():  # 忽略空行
-                        new_logs.append(line.strip())
     except Exception as e:
         new_logs.append(f"ERROR: 读取日志文件失败: {str(e)}")
     
@@ -528,13 +539,20 @@ def main():
                             log_file.flush()
                             
                             # 启动进程，输出到日志文件
+                            # 设置中文编码环境变量
+                            env = os.environ.copy()
+                            env['PYTHONIOENCODING'] = 'utf-8'
+                            
                             process = subprocess.Popen(
                                 cmd,
                                 cwd=os.getcwd(),
                                 stdout=log_file,
                                 stderr=subprocess.STDOUT,
                                 universal_newlines=True,
-                                bufsize=1
+                                bufsize=1,
+                                env=env,
+                                encoding='utf-8',
+                                errors='replace'
                             )
                             
                             st.session_state.analysis_process = process
@@ -593,6 +611,8 @@ def main():
                 for line in new_logs:
                     st.session_state.last_log_check += 1
                     st.session_state.logs.append(f"[{st.session_state.last_log_check:04d}] {line}")
+                # 如果有新日志，立即刷新页面
+                st.rerun()
             
             # 检查进程是否结束
             return_code = process.poll()
