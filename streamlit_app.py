@@ -223,6 +223,41 @@ def create_log_file():
         st.error(f"创建日志文件失败: {str(e)}")
         return None
 
+def estimate_progress(logs):
+    """基于日志内容估算分析进度"""
+    if not logs:
+        return 0
+    
+    # 定义关键进度节点
+    progress_keywords = {
+        "开始": 5,
+        "加载数据": 10, 
+        "loading": 10,
+        "POD分析": 25,
+        "SVD": 30,
+        "特征值": 35,
+        "模态分析": 45,
+        "autoencoder": 60,
+        "训练": 70,
+        "training": 70,
+        "保存": 85,
+        "save": 85,
+        "完成": 95,
+        "success": 95,
+        "finished": 100
+    }
+    
+    max_progress = 0
+    recent_logs = logs[-20:]  # 只检查最近20行日志
+    
+    for log in recent_logs:
+        log_lower = log.lower()
+        for keyword, progress in progress_keywords.items():
+            if keyword in log_lower:
+                max_progress = max(max_progress, progress)
+    
+    return max_progress
+
 def main():
     # 初始化session state
     if 'logs' not in st.session_state:
@@ -244,24 +279,38 @@ def main():
     st.markdown('<h1 class="main-header">📡 RCS POD Analysis Dashboard</h1>', 
                 unsafe_allow_html=True)
     
-    # 如果分析正在运行，显示自动刷新提示并添加刷新机制
+    # 如果分析正在运行，显示实时状态和流式更新机制
     if st.session_state.analysis_running:
-        st.markdown("""
-        <div style="background-color: #e1f5fe; padding: 10px; border-radius: 5px; margin: 10px 0;">
-            <p style="margin: 0; color: #0277bd;">
-                🔄 分析进行中，页面每3秒自动刷新以获取最新日志...
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+        # 创建实时状态显示区域
+        status_container = st.container()
+        with status_container:
+            col1, col2, col3 = st.columns([2, 1, 1])
+            with col1:
+                st.markdown("""
+                <div style="background-color: #e1f5fe; padding: 10px; border-radius: 5px; margin: 5px 0;">
+                    <p style="margin: 0; color: #0277bd; font-weight: bold;">
+                        🔄 实时分析中 - 日志正在流式更新...
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            with col2:
+                # 显示运行时间
+                if hasattr(st.session_state, 'analysis_start_time'):
+                    runtime = time.time() - st.session_state.analysis_start_time
+                    st.metric("运行时间", f"{int(runtime//60)}:{int(runtime%60):02d}")
+                else:
+                    st.metric("运行时间", "未知")
+            
+            with col3:
+                # 显示估算进度
+                progress = estimate_progress(st.session_state.logs)
+                st.metric("分析进度", f"{progress}%")
         
-        # 使用JavaScript自动刷新
-        st.markdown("""
-        <script>
-            setTimeout(function(){
-                window.location.reload();
-            }, 3000);
-        </script>
-        """, unsafe_allow_html=True)
+        # 添加进度条
+        if st.session_state.logs:
+            progress = estimate_progress(st.session_state.logs)
+            st.progress(progress / 100, f"分析进度: {progress}%")
     
     # 环境信息显示（可折叠）
     with st.expander("🔍 环境信息", expanded=False):
@@ -578,6 +627,7 @@ def main():
                             st.session_state.analysis_running = True
                             st.session_state.analysis_complete = False
                             st.session_state.last_log_check = 0
+                            st.session_state.analysis_start_time = time.time()  # 记录开始时间
                             
                             # 重置文件读取位置到当前位置
                             with open(log_file_path, 'r', encoding='utf-8') as f:
@@ -620,17 +670,37 @@ def main():
             else:
                 st.button("⏹️ 停止分析", disabled=True, width='stretch')
         
-        # 实时检查进程状态和从日志文件读取输出
+        # 流式实时检查进程状态和日志更新
         if st.session_state.analysis_running and st.session_state.analysis_process:
             process = st.session_state.analysis_process
             
+            # 创建一个占位符用于实时更新日志状态
+            log_status_placeholder = st.empty()
+            
             # 从日志文件读取新内容
             new_logs = read_log_file_updates()
+            has_new_logs = False
+            
             if new_logs:
                 for line in new_logs:
                     st.session_state.last_log_check += 1
                     st.session_state.logs.append(f"[{st.session_state.last_log_check:04d}] {line}")
-                # 如果有新日志，立即刷新页面
+                    has_new_logs = True
+                
+                # 更新日志状态显示
+                with log_status_placeholder.container():
+                    st.success(f"📥 获取到 {len(new_logs)} 条新日志 (总共 {len(st.session_state.logs)} 条)")
+                
+                # 立即刷新页面显示新日志
+                st.rerun()
+            else:
+                # 没有新日志时，显示等待状态
+                with log_status_placeholder.container():
+                    st.info("⏳ 等待新日志输出...")
+                
+                # 使用更短的延迟，提高响应速度
+                import time
+                time.sleep(0.5)
                 st.rerun()
             
             # 检查进程是否结束
@@ -798,20 +868,48 @@ def main():
                         highlighted_logs.append(log)
                 log_text = '\n'.join(highlighted_logs)
             
+            # 流式日志显示区域 - 使用动态key确保实时更新
+            log_key = f"log_stream_{len(st.session_state.logs)}_{int(time.time())}"
             st.text_area(
-                "实时日志输出", 
+                "📋 实时日志流", 
                 value=log_text, 
                 height=max_height,
                 disabled=True,
-                key=f"log_display_{len(st.session_state.logs)}"  # 动态key确保更新
+                key=log_key,
+                help="日志会自动实时更新，显示最新的分析进度"
             )
             
-            # 显示最新日志行的简要信息
+            # 实时状态栏
             if st.session_state.logs:
-                latest_log = st.session_state.logs[-1]
-                if len(latest_log) > 80:
-                    latest_log = latest_log[:80] + "..."
-                st.caption(f"最新: {latest_log}")
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    latest_log = st.session_state.logs[-1]
+                    if len(latest_log) > 40:
+                        latest_log = latest_log[:40] + "..."
+                    st.caption(f"🔄 最新: {latest_log}")
+                
+                with col2:
+                    error_count = len([log for log in st.session_state.logs if any(k in log.lower() for k in ['error', '错误', 'fail'])])
+                    if error_count > 0:
+                        st.caption(f"❌ 错误: {error_count}")
+                    else:
+                        st.caption("✅ 无错误")
+                
+                with col3:
+                    if st.session_state.log_file_path and os.path.exists(st.session_state.log_file_path):
+                        try:
+                            file_size = os.path.getsize(st.session_state.log_file_path) / 1024
+                            st.caption(f"📄 大小: {file_size:.1f}KB")
+                        except:
+                            st.caption("📄 文件大小: 未知")
+                
+                with col4:
+                    if st.session_state.analysis_running:
+                        st.caption("🔄 运行中...")
+                    elif st.session_state.analysis_complete:
+                        st.caption("✅ 已完成")
+                    else:
+                        st.caption("⏸️ 待运行")
         
         # 下载日志功能
         col1, col2 = st.columns(2)
