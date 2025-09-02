@@ -142,7 +142,8 @@ def check_gpu_status():
             handle = pynvml.nvmlDeviceGetHandleByIndex(i)
             
             # 获取基本信息
-            name = pynvml.nvmlDeviceGetName(handle).decode('utf-8')
+            name_raw = pynvml.nvmlDeviceGetName(handle)
+            name = name_raw.decode('utf-8') if isinstance(name_raw, bytes) else name_raw
             
             # 获取内存信息
             mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
