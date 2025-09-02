@@ -206,6 +206,7 @@ def read_log_file_updates():
 
 def create_log_file():
     """创建新的日志文件"""
+    import time  # 确保time模块在函数作用域中可用
     timestamp = time.strftime('%Y%m%d_%H%M%S')
     log_filename = f"streamlit_analysis_{timestamp}.log"
     log_path = os.path.join(os.getcwd(), log_filename)
@@ -297,6 +298,7 @@ def main():
             with col2:
                 # 显示运行时间
                 if hasattr(st.session_state, 'analysis_start_time'):
+                    import time  # 确保time模块在作用域中可用
                     runtime = time.time() - st.session_state.analysis_start_time
                     st.metric("运行时间", f"{int(runtime//60)}:{int(runtime%60):02d}")
                 else:
@@ -627,6 +629,7 @@ def main():
                             st.session_state.analysis_running = True
                             st.session_state.analysis_complete = False
                             st.session_state.last_log_check = 0
+                            import time  # 确保time模块可用
                             st.session_state.analysis_start_time = time.time()  # 记录开始时间
                             
                             # 重置文件读取位置到当前位置
@@ -657,6 +660,7 @@ def main():
                         process = st.session_state.analysis_process
                         if process and process.poll() is None:  # 进程还在运行
                             process.terminate()
+                            import time
                             time.sleep(1)
                             if process.poll() is None:  # 如果还没结束，强制杀死
                                 process.kill()
@@ -699,7 +703,6 @@ def main():
                     st.info("⏳ 等待新日志输出...")
                 
                 # 使用更短的延迟，提高响应速度
-                import time
                 time.sleep(0.5)
                 st.rerun()
             
@@ -707,6 +710,7 @@ def main():
             return_code = process.poll()
             if return_code is not None:
                 # 进程已结束，等待一下以确保所有输出都写入文件
+                import time
                 time.sleep(1)
                 
                 # 读取剩余的日志
@@ -869,6 +873,7 @@ def main():
                 log_text = '\n'.join(highlighted_logs)
             
             # 流式日志显示区域 - 使用动态key确保实时更新
+            import time  # 确保time模块可用
             log_key = f"log_stream_{len(st.session_state.logs)}_{int(time.time())}"
             st.text_area(
                 "📋 实时日志流", 
@@ -916,6 +921,7 @@ def main():
         with col1:
             if len(st.session_state.logs) > 0:
                 log_content = '\n'.join(st.session_state.logs)
+                import time  # 确保time模块可用
                 st.download_button(
                     label="📥 下载界面日志",
                     data=log_content,
@@ -940,12 +946,14 @@ def main():
         # 如果分析正在运行，自动刷新
         if st.session_state.analysis_running:
             # 减少刷新频率以提高性能
+            import time
             time.sleep(2)
             st.rerun()
     else:
         st.info("📋 运行日志将在这里显示...")
         if st.session_state.analysis_running:
             st.info("🔄 分析正在启动，请稍等...")
+            import time
             time.sleep(1)
             st.rerun()
     
