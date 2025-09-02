@@ -244,6 +244,25 @@ def main():
     st.markdown('<h1 class="main-header">📡 RCS POD Analysis Dashboard</h1>', 
                 unsafe_allow_html=True)
     
+    # 如果分析正在运行，显示自动刷新提示并添加刷新机制
+    if st.session_state.analysis_running:
+        st.markdown("""
+        <div style="background-color: #e1f5fe; padding: 10px; border-radius: 5px; margin: 10px 0;">
+            <p style="margin: 0; color: #0277bd;">
+                🔄 分析进行中，页面每3秒自动刷新以获取最新日志...
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 使用JavaScript自动刷新
+        st.markdown("""
+        <script>
+            setTimeout(function(){
+                window.location.reload();
+            }, 3000);
+        </script>
+        """, unsafe_allow_html=True)
+    
     # 环境信息显示（可折叠）
     with st.expander("🔍 环境信息", expanded=False):
         col1, col2 = st.columns(2)
@@ -708,13 +727,33 @@ def main():
                 st.metric("状态", "待运行", delta="⏸️")
         
         # 日志控制按钮
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             show_all_logs = st.checkbox("显示全部日志", value=False)
         with col2:
-            if st.button("🔄 刷新", disabled=st.session_state.analysis_running):
+            if st.button("🔄 刷新日志"):
+                # 强制重新读取日志文件
+                if st.session_state.log_file_path and os.path.exists(st.session_state.log_file_path):
+                    st.session_state.log_file_position = 0  # 重置读取位置
+                    st.session_state.logs = []  # 清空当前日志
+                    # 重新读取整个日志文件
+                    all_logs = read_log_file_updates()
+                    line_num = 0
+                    for line in all_logs:
+                        line_num += 1
+                        st.session_state.logs.append(f"[{line_num:04d}] {line}")
+                    st.session_state.last_log_check = line_num
+                st.success("日志已刷新!")
                 st.rerun()
         with col3:
+            if st.button("📂 打开日志文件"):
+                if st.session_state.log_file_path and os.path.exists(st.session_state.log_file_path):
+                    import subprocess
+                    try:
+                        subprocess.run(['notepad.exe', st.session_state.log_file_path])
+                    except:
+                        st.error("无法打开日志文件")
+        with col4:
             if st.button("🗑️ 清空", disabled=st.session_state.analysis_running):
                 st.session_state.logs = []
                 st.rerun()
