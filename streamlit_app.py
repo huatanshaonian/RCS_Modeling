@@ -126,6 +126,10 @@ def load_config(filename="streamlit_config.json"):
 def run_analysis(config):
     """运行分析的后台函数"""
     try:
+        # 添加初始日志
+        st.session_state.logs.append("=== 开始分析 ===")
+        st.session_state.logs.append(f"当前工作目录: {os.getcwd()}")
+        
         # 构建命令
         cmd = ['python', 'run.py']
         cmd.extend(['--params_path', config['params_path']])
@@ -153,26 +157,49 @@ def run_analysis(config):
             
             if config.get('skip_ae_training', False):
                 cmd.append('--skip_ae_training')
-            
+        
+        # 记录命令
+        cmd_str = ' '.join(cmd)
+        st.session_state.logs.append(f"执行命令: {cmd_str}")
+        st.session_state.logs.append("--- 分析程序输出 ---")
+        
         # 运行命令
         process = subprocess.Popen(
             cmd, 
             stdout=subprocess.PIPE, 
             stderr=subprocess.STDOUT,
             universal_newlines=True,
-            bufsize=1
+            bufsize=1,
+            cwd=os.getcwd()  # 明确指定工作目录
         )
         
         # 实时读取输出
+        line_count = 0
         for line in process.stdout:
-            st.session_state.logs.append(line.strip())
+            line_count += 1
+            clean_line = line.strip()
+            if clean_line:  # 只添加非空行
+                st.session_state.logs.append(f"[{line_count:04d}] {clean_line}")
             
-        process.wait()
-        st.session_state.analysis_running = False
-        st.session_state.analysis_complete = True
+        # 等待进程完成
+        return_code = process.wait()
         
+        if return_code == 0:
+            st.session_state.logs.append("=== 分析成功完成 ===")
+            st.session_state.analysis_complete = True
+        else:
+            st.session_state.logs.append(f"=== 分析失败，返回码: {return_code} ===")
+            
+        st.session_state.analysis_running = False
+        
+    except FileNotFoundError:
+        st.session_state.logs.append("错误: 找不到python或run.py文件")
+        st.session_state.logs.append("请确认您在正确的目录中运行此程序")
+        st.session_state.analysis_running = False
     except Exception as e:
-        st.session_state.logs.append(f"错误: {str(e)}")
+        st.session_state.logs.append(f"分析过程中发生错误: {str(e)}")
+        import traceback
+        st.session_state.logs.append(f"详细错误信息: {traceback.format_exc()}")
         st.session_state.analysis_running = False
 
 def main():
@@ -251,11 +278,11 @@ def main():
         if config['pod_enabled']:
             st.markdown("#### 📐 POD分析参数")
             
-            # POD模态数量
+            # POD多模态对比分析
             pod_modes_str = st.text_input(
-                "POD模态数量 (逗号分隔)", 
+                "POD多模态对比 (逗号分隔)", 
                 value=','.join(map(str, config.get('pod_modes', [10, 20, 30, 40]))),
-                help="指定要分析的POD模态数量列表，如：10,20,30,40"
+                help="指定要进行重建对比分析的POD模态数量列表，如：10,20,30,40。程序会分别使用这些数量的模态进行RCS重建，以评估不同模态数的重建效果"
             )
             try:
                 config['pod_modes'] = [int(x.strip()) for x in pod_modes_str.split(',')]

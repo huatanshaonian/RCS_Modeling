@@ -23,15 +23,31 @@ st.set_page_config(
 
 def get_system_info():
     """获取系统信息"""
-    # Windows下获取C盘使用情况，其他系统使用根目录
-    disk_path = 'C:\\' if os.name == 'nt' else '/'
-    
-    return {
-        'cpu_percent': psutil.cpu_percent(interval=1),
-        'memory': psutil.virtual_memory(),
-        'disk': psutil.disk_usage(disk_path),
-        'boot_time': datetime.fromtimestamp(psutil.boot_time())
-    }
+    try:
+        # Windows下获取当前驱动器使用情况，其他系统使用根目录
+        if os.name == 'nt':
+            # Windows: 获取当前工作目录所在的驱动器
+            import os
+            current_drive = os.path.splitdrive(os.getcwd())[0] + os.sep
+            disk_path = current_drive
+        else:
+            disk_path = '/'
+        
+        return {
+            'cpu_percent': psutil.cpu_percent(interval=1),
+            'memory': psutil.virtual_memory(),
+            'disk': psutil.disk_usage(disk_path),
+            'boot_time': datetime.fromtimestamp(psutil.boot_time())
+        }
+    except Exception as e:
+        st.error(f"获取系统信息失败: {e}")
+        # 返回默认值
+        return {
+            'cpu_percent': 0.0,
+            'memory': type('obj', (object,), {'percent': 0, 'used': 0, 'total': 1})(),
+            'disk': type('obj', (object,), {'used': 0, 'total': 1, 'free': 1})(),
+            'boot_time': datetime.now()
+        }
 
 def find_python_processes():
     """查找Python相关进程"""
