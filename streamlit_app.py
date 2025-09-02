@@ -807,21 +807,24 @@ def main():
                 except:
                     st.error("无法打开文件夹")
     
-    if st.session_state.logs:
-        # 日志状态信息
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("总日志行数", len(st.session_state.logs))
-        with col2:
+    # 始终显示日志状态信息，无论是否有日志
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        log_count = len(st.session_state.logs) if st.session_state.logs else 0
+        st.metric("总日志行数", log_count)
+    with col2:
+        if st.session_state.logs:
             error_count = len([log for log in st.session_state.logs if "ERROR" in log or "失败" in log])
             st.metric("错误数", error_count, delta="❌" if error_count > 0 else "✅")
-        with col3:
-            if st.session_state.analysis_running:
-                st.metric("状态", "运行中", delta="🔄")
-            elif st.session_state.analysis_complete:
-                st.metric("状态", "已完成", delta="✅")
-            else:
-                st.metric("状态", "待运行", delta="⏸️")
+        else:
+            st.metric("错误数", 0, delta="✅")
+    with col3:
+        if st.session_state.analysis_running:
+            st.metric("状态", "运行中", delta="🔄")
+        elif st.session_state.analysis_complete:
+            st.metric("状态", "已完成", delta="✅")
+        else:
+            st.metric("状态", "待运行", delta="⏸️")
         
         # 日志控制按钮
         col1, col2, col3, col4 = st.columns(4)
@@ -855,18 +858,30 @@ def main():
                 st.session_state.logs = []
                 st.rerun()
         
-        # 显示日志
+        # 显示日志 - 始终显示日志框
         log_container = st.container()
         with log_container:
-            if show_all_logs:
-                display_logs = st.session_state.logs
-                max_height = 600
+            # 处理日志显示逻辑
+            if st.session_state.logs:
+                # 有日志时的正常显示
+                if show_all_logs:
+                    display_logs = st.session_state.logs
+                    max_height = 600
+                else:
+                    # 只显示最后100行日志以提高性能
+                    display_logs = st.session_state.logs[-100:] if len(st.session_state.logs) > 100 else st.session_state.logs
+                    max_height = 400
+                
+                log_text = '\n'.join(display_logs)
             else:
-                # 只显示最后100行日志以提高性能
-                display_logs = st.session_state.logs[-100:] if len(st.session_state.logs) > 100 else st.session_state.logs
+                # 没有日志时的显示
+                if st.session_state.analysis_running:
+                    log_text = "🔄 分析正在启动中...\n等待程序输出日志...\n\n如果长时间无输出，请检查:\n1. Python环境是否正确\n2. 数据文件路径是否存在\n3. 命令参数是否正确"
+                else:
+                    log_text = "📋 等待开始分析...\n\n点击上方 '🚀 开始分析' 按钮开始运行分析。\n日志将在这里实时显示。"
+                
                 max_height = 400
-            
-            log_text = '\n'.join(display_logs)
+                display_logs = []
             
             # 使用更好的样式显示日志
             st.markdown("""
@@ -880,9 +895,10 @@ def main():
             </style>
             """, unsafe_allow_html=True)
             
-            # 如果有错误，高亮显示
-            if error_count > 0:
-                # 处理日志文本，高亮错误行
+            # 如果有日志，进行高亮处理
+            if display_logs:
+                error_count = len([log for log in display_logs if "ERROR" in log or "失败" in log])
+                # 处理日志文本，高亮不同类型的行
                 highlighted_logs = []
                 for log in display_logs:
                     if "ERROR" in log or "失败" in log:
@@ -966,27 +982,12 @@ def main():
                 except:
                     st.warning("无法读取日志文件")
         
-        # 如果分析正在运行，自动刷新
-        if st.session_state.analysis_running:
-            # 减少刷新频率以提高性能
-            import time
-            time.sleep(0.3)  # 加快刷新速度，提高响应性
-            st.rerun()
-    else:
-        # 始终显示日志输入框，即使没有日志
-        st.text_area(
-            "📋 实时日志流",
-            value="等待开始分析...\n点击上方'🚀 开始分析'按钮开始运行。",
-            height=400,
-            disabled=True,
-            help="分析开始后，日志将在这里实时显示"
-        )
-        
-        if st.session_state.analysis_running:
-            st.info("🔄 分析正在启动，请稍等...")
-            import time
-            time.sleep(0.3)  # 加快启动检查速度
-            st.rerun()
+    # 如果分析正在运行，自动刷新
+    if st.session_state.analysis_running:
+        # 减少刷新频率以提高性能  
+        import time
+        time.sleep(0.3)  # 加快刷新速度，提高响应性
+        st.rerun()
     
     # 结果分析区域
     if st.session_state.analysis_complete:
