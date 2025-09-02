@@ -27,7 +27,6 @@ def get_system_info():
         # Windows下获取当前驱动器使用情况，其他系统使用根目录
         if os.name == 'nt':
             # Windows: 获取当前工作目录所在的驱动器
-            import os
             current_drive = os.path.splitdrive(os.getcwd())[0] + os.sep
             disk_path = current_drive
         else:
