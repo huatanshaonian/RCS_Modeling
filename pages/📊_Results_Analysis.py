@@ -29,8 +29,19 @@ def load_pod_results(results_dir, freq, train_size):
         # 加载POD模态和特征值
         if (base_dir / "pod_modes.npy").exists():
             modes = np.load(base_dir / "pod_modes.npy")
-            eigenvals = np.load(base_dir / "pod_eigenvalues.npy") if (base_dir / "pod_eigenvalues.npy").exists() else None
-            coeffs = np.load(base_dir / "pod_coefficients.npy") if (base_dir / "pod_coefficients.npy").exists() else None
+            # 检查可能的特征值文件名
+            eigenvals = None
+            if (base_dir / "lambda_values.npy").exists():
+                eigenvals = np.load(base_dir / "lambda_values.npy")
+            elif (base_dir / "pod_eigenvalues.npy").exists():
+                eigenvals = np.load(base_dir / "pod_eigenvalues.npy")
+            
+            # 检查可能的系数文件名
+            coeffs = None
+            if (base_dir / "pod_coeffs_train.npy").exists():
+                coeffs = np.load(base_dir / "pod_coeffs_train.npy")
+            elif (base_dir / "pod_coefficients.npy").exists():
+                coeffs = np.load(base_dir / "pod_coefficients.npy")
             
             return {
                 'modes': modes,
@@ -249,6 +260,15 @@ def main():
     selected_size = st.sidebar.selectbox("选择训练集大小", available_train_sizes)
     
     # 加载结果
+    with st.expander("🔍 调试信息", expanded=False):
+        st.write(f"Results directory: {results_dir}")
+        st.write(f"Looking for: {results_dir}/{selected_freq}/train_{selected_size}")
+        result_path = Path(results_dir) / selected_freq / f"train_{selected_size}"
+        st.write(f"Directory exists: {result_path.exists()}")
+        if result_path.exists():
+            files = list(result_path.glob("*.npy"))
+            st.write(f"Found NPY files: {[f.name for f in files]}")
+    
     pod_results = load_pod_results(results_dir, selected_freq, selected_size)
     ae_results = load_autoencoder_results(results_dir, selected_freq, selected_size)
     
@@ -337,6 +357,19 @@ def main():
                 st.info("Autoencoder结果不可用")
         
         with tab3:
+            # 添加调试信息
+            with st.expander("🔧 对比分析调试信息", expanded=False):
+                st.write(f"POD available: {pod_results.get('available', False)}")
+                st.write(f"AE available: {ae_results.get('available', False)}")
+                if pod_results.get('available', False):
+                    st.write(f"POD eigenvalues available: {pod_results.get('eigenvalues') is not None}")
+                    if pod_results.get('eigenvalues') is not None:
+                        st.write(f"Eigenvalues shape: {pod_results['eigenvalues'].shape}")
+                if ae_results.get('available', False):
+                    st.write(f"AE configs count: {len(ae_results.get('configs', []))}")
+                    for i, config in enumerate(ae_results.get('configs', [])):
+                        st.write(f"Config {i}: {config['name']}, dim: {config['latent_dim']}")
+            
             if pod_results['available'] and ae_results['available']:
                 st.subheader("POD vs Autoencoder 对比分析")
                 
