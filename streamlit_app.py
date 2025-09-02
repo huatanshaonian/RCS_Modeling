@@ -174,30 +174,27 @@ def read_log_file_updates():
     
     new_logs = []
     try:
-        # 尝试多种编码方式读取文件
-        encodings = ['utf-8', 'gbk', 'gb2312', 'cp936']
-        
-        for encoding in encodings:
-            try:
-                with open(st.session_state.log_file_path, 'r', encoding=encoding, errors='replace') as f:
-                    # 从上次读取位置开始
-                    f.seek(st.session_state.log_file_position)
-                    new_content = f.read()
-                    
-                    if new_content:
-                        # 更新文件位置
-                        st.session_state.log_file_position = f.tell()
-                        
-                        # 按行分割新内容
-                        new_lines = new_content.strip().split('\n')
-                        for line in new_lines:
-                            clean_line = line.strip()
-                            if clean_line:  # 忽略空行
-                                new_logs.append(clean_line)
-                    break  # 成功读取，跳出编码循环
-                    
-            except (UnicodeDecodeError, UnicodeError):
-                continue  # 尝试下一个编码
+        # 使用utf-8编码读取文件（简化编码处理）
+        with open(st.session_state.log_file_path, 'r', encoding='utf-8', errors='replace') as f:
+            # 获取当前文件大小
+            f.seek(0, 2)
+            current_size = f.tell()
+            
+            # 如果文件大小没有变化，说明没有新内容
+            if current_size <= st.session_state.log_file_position:
+                return []
+            
+            # 从上次读取位置开始读取
+            f.seek(st.session_state.log_file_position)
+            new_content = f.read()
+            
+            if new_content:
+                # 更新文件位置
+                st.session_state.log_file_position = f.tell()
+                
+                # 按行分割新内容，过滤空行
+                new_lines = [line.strip() for line in new_content.split('\n') if line.strip()]
+                new_logs.extend(new_lines)
                 
     except Exception as e:
         new_logs.append(f"ERROR: 读取日志文件失败: {str(e)}")
@@ -621,14 +618,16 @@ def main():
                         try:
                             import subprocess
                             
-                            # 使用自动刷新的日志文件包装器
-                            log_file = FlushingLogFile(log_file_path, 'a', 'utf-8')
+                            # 使用简单的文件处理，确保立即刷新
+                            with open(log_file_path, 'a', encoding='utf-8', buffering=1) as init_log:
+                                init_log.write(f"=== 开始分析 ===\n")
+                                init_log.write(f"当前工作目录: {os.getcwd()}\n") 
+                                init_log.write(f"执行命令: {cmd_str}\n")
+                                init_log.write("--- 分析程序输出 ---\n")
+                                init_log.flush()
                             
-                            # 写入命令信息（每次写入都会自动立即刷新到磁盘）
-                            log_file.write(f"=== 开始分析 ===\n")
-                            log_file.write(f"当前工作目录: {os.getcwd()}\n") 
-                            log_file.write(f"执行命令: {cmd_str}\n")
-                            log_file.write("--- 分析程序输出 ---\n")
+                            # 重新打开文件用于subprocess
+                            log_file = open(log_file_path, 'a', encoding='utf-8', buffering=1)
                             
                             # 启动进程，输出到日志文件
                             # 设置中文编码环境变量和无缓冲输出
@@ -639,14 +638,17 @@ def main():
                             process = subprocess.Popen(
                                 cmd,
                                 cwd=os.getcwd(),
-                                stdout=log_file.file,  # 使用包装器内部的文件对象
+                                stdout=log_file,
                                 stderr=subprocess.STDOUT,
                                 universal_newlines=True,
-                                bufsize=0,  # 无缓冲，立即写入
+                                bufsize=1,  # 行缓冲
                                 env=env,
                                 encoding='utf-8',
                                 errors='replace'
                             )
+                            
+                            # 保存日志文件引用，以便后续关闭
+                            st.session_state.analysis_log_file = log_file
                             
                             st.session_state.analysis_process = process
                             st.session_state.analysis_running = True
@@ -655,10 +657,8 @@ def main():
                             import time  # 确保time模块可用
                             st.session_state.analysis_start_time = time.time()  # 记录开始时间
                             
-                            # 重置文件读取位置到当前位置
-                            with open(log_file_path, 'r', encoding='utf-8') as f:
-                                f.seek(0, 2)  # 移动到文件末尾
-                                st.session_state.log_file_position = f.tell()
+                            # 设置文件读取位置为开头，以便读取所有日志
+                            st.session_state.log_file_position = 0
                             
                             st.success(f"分析已启动！日志文件: {os.path.basename(log_file_path)}")
                             st.rerun()
@@ -706,13 +706,12 @@ def main():
             
             # 从日志文件读取新内容
             new_logs = read_log_file_updates()
-            has_new_logs = False
             
             if new_logs:
+                # 添加新日志到session state
                 for line in new_logs:
                     st.session_state.last_log_check += 1
                     st.session_state.logs.append(f"[{st.session_state.last_log_check:04d}] {line}")
-                    has_new_logs = True
                 
                 # 更新日志状态显示
                 with log_status_placeholder.container():
@@ -721,12 +720,20 @@ def main():
                 # 立即刷新页面显示新日志
                 st.rerun()
             else:
-                # 没有新日志时，显示等待状态
+                # 没有新日志时，显示调试信息和等待状态
                 with log_status_placeholder.container():
-                    st.info("⏳ 等待新日志输出...")
+                    # 显示调试信息
+                    if st.session_state.log_file_path and os.path.exists(st.session_state.log_file_path):
+                        try:
+                            file_size = os.path.getsize(st.session_state.log_file_path)
+                            st.info(f"⏳ 等待新日志... (文件大小: {file_size}B, 读取位置: {st.session_state.log_file_position})")
+                        except:
+                            st.info("⏳ 等待新日志输出...")
+                    else:
+                        st.warning("日志文件不存在或路径错误")
                 
                 # 使用更短的延迟，提高响应速度
-                time.sleep(0.2)  # 减少到0.2秒，提高实时性
+                time.sleep(0.2)
                 st.rerun()
             
             # 检查进程是否结束
