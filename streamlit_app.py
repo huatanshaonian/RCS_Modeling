@@ -234,106 +234,134 @@ def main():
     config['ae_enabled'] = st.sidebar.checkbox("启用Autoencoder分析", value=config.get('ae_enabled', True))
     config['skip_ae_training'] = st.sidebar.checkbox("跳过AE重训练", value=config.get('skip_ae_training', False))
     
-    # POD参数
-    if config['pod_enabled']:
-        st.sidebar.markdown("### 📐 POD参数")
-        
-        # POD模态数量
-        pod_modes_str = st.sidebar.text_input(
-            "POD模态数量 (逗号分隔)", 
-            value=','.join(map(str, config.get('pod_modes', [10, 20, 30, 40]))),
-            help="指定要分析的POD模态数量列表"
-        )
-        try:
-            config['pod_modes'] = [int(x.strip()) for x in pod_modes_str.split(',')]
-        except:
-            config['pod_modes'] = [10, 20, 30, 40]
-            
-        # 能量阈值
-        config['energy_threshold'] = st.sidebar.slider(
-            "能量阈值 (%)", 
-            min_value=80.0, 
-            max_value=99.9, 
-            value=config.get('energy_threshold', 95.0),
-            step=0.1,
-            help="自动确定模态数量的能量阈值"
-        )
-        
-        # 可视化模态数量
-        config['num_modes_visualize'] = st.sidebar.number_input(
-            "可视化模态数", 
-            min_value=1, 
-            max_value=50, 
-            value=config.get('num_modes_visualize', 10),
-            help="在图表中显示的POD模态数量"
-        )
-        
-        # 重建模态数量
-        config['pod_reconstruct_num'] = st.sidebar.number_input(
-            "重建使用的模态数", 
-            min_value=0, 
-            max_value=100, 
-            value=config.get('pod_reconstruct_num', 0),
-            help="0表示使用能量阈值自动确定"
-        )
-    
-    # Autoencoder参数
-    if config['ae_enabled']:
-        st.sidebar.markdown("### 🔬 Autoencoder参数")
-        
-        # 基础参数
-        latent_dims_str = st.sidebar.text_input(
-            "隐空间维度 (逗号分隔)", 
-            value=','.join(map(str, config.get('latent_dims', [5, 10, 15, 20])))
-        )
-        try:
-            config['latent_dims'] = [int(x.strip()) for x in latent_dims_str.split(',')]
-        except:
-            config['latent_dims'] = [5, 10, 15, 20]
-            
-        config['model_types'] = st.sidebar.multiselect(
-            "模型类型",
-            options=['standard', 'vae'],
-            default=config.get('model_types', ['standard', 'vae'])
-        )
-        
-        # 训练参数
-        with st.sidebar.expander("🎛️ 高级训练参数"):
-            config['ae_epochs'] = st.sidebar.number_input(
-                "训练轮数", 
-                min_value=50, 
-                max_value=1000, 
-                value=config.get('ae_epochs', 200)
-            )
-            
-            config['ae_learning_rate'] = st.sidebar.number_input(
-                "学习率", 
-                min_value=0.0001, 
-                max_value=0.1, 
-                value=config.get('ae_learning_rate', 0.001),
-                format="%.4f"
-            )
-            
-            config['ae_batch_size'] = st.sidebar.number_input(
-                "批次大小", 
-                min_value=0, 
-                max_value=256, 
-                value=config.get('ae_batch_size', 0),
-                help="0表示自动确定"
-            )
-            
-            config['ae_device'] = st.sidebar.selectbox(
-                "计算设备",
-                options=['auto', 'cpu', 'cuda'],
-                index=['auto', 'cpu', 'cuda'].index(config.get('ae_device', 'auto'))
-            )
-    
     # 保存配置
     if st.sidebar.button("💾 保存配置"):
         save_config(config)
         st.sidebar.success("配置已保存!")
     
+    # 算法参数配置区域
+    st.markdown("---")
+    st.markdown("### ⚙️ 详细参数配置")
+    
+    # 创建POD和AE参数的横向布局
+    param_col1, param_col2 = st.columns(2)
+    
+    # POD参数配置
+    with param_col1:
+        if config['pod_enabled']:
+            st.markdown("#### 📐 POD分析参数")
+            
+            # POD模态数量
+            pod_modes_str = st.text_input(
+                "POD模态数量 (逗号分隔)", 
+                value=','.join(map(str, config.get('pod_modes', [10, 20, 30, 40]))),
+                help="指定要分析的POD模态数量列表，如：10,20,30,40"
+            )
+            try:
+                config['pod_modes'] = [int(x.strip()) for x in pod_modes_str.split(',')]
+            except:
+                config['pod_modes'] = [10, 20, 30, 40]
+            
+            # 能量阈值 - 改为输入框
+            energy_threshold_input = st.text_input(
+                "能量阈值 (%)", 
+                value=str(config.get('energy_threshold', 95.0)),
+                help="自动确定模态数量的能量阈值，支持任意精度的百分比值，如：95.0, 99.5, 90.2"
+            )
+            try:
+                config['energy_threshold'] = float(energy_threshold_input)
+                if not (0 < config['energy_threshold'] < 100):
+                    st.error("能量阈值必须在0-100之间")
+                    config['energy_threshold'] = 95.0
+            except ValueError:
+                st.error("请输入有效的数值")
+                config['energy_threshold'] = 95.0
+            
+            # POD其他参数
+            pod_col1, pod_col2 = st.columns(2)
+            with pod_col1:
+                config['num_modes_visualize'] = st.number_input(
+                    "可视化模态数", 
+                    min_value=1, 
+                    max_value=50, 
+                    value=config.get('num_modes_visualize', 10),
+                    help="在图表中显示的POD模态数量"
+                )
+            with pod_col2:
+                config['pod_reconstruct_num'] = st.number_input(
+                    "重建使用的模态数", 
+                    min_value=0, 
+                    max_value=100, 
+                    value=config.get('pod_reconstruct_num', 0),
+                    help="0表示使用能量阈值自动确定"
+                )
+        else:
+            st.markdown("#### 📐 POD分析参数")
+            st.info("POD分析已禁用")
+    
+    # Autoencoder参数配置
+    with param_col2:
+        if config['ae_enabled']:
+            st.markdown("#### 🔬 Autoencoder参数")
+            
+            # 基础参数
+            latent_dims_str = st.text_input(
+                "隐空间维度 (逗号分隔)", 
+                value=','.join(map(str, config.get('latent_dims', [5, 10, 15, 20]))),
+                help="要测试的隐空间维度列表，如：5,10,15,20"
+            )
+            try:
+                config['latent_dims'] = [int(x.strip()) for x in latent_dims_str.split(',')]
+            except:
+                config['latent_dims'] = [5, 10, 15, 20]
+                
+            config['model_types'] = st.multiselect(
+                "模型类型",
+                options=['standard', 'vae'],
+                default=config.get('model_types', ['standard', 'vae']),
+                help="选择要训练的自编码器类型"
+            )
+            
+            # 训练参数
+            st.markdown("**训练参数**")
+            ae_col1, ae_col2 = st.columns(2)
+            
+            with ae_col1:
+                config['ae_epochs'] = st.number_input(
+                    "训练轮数", 
+                    min_value=50, 
+                    max_value=1000, 
+                    value=config.get('ae_epochs', 200)
+                )
+                
+                config['ae_learning_rate'] = st.number_input(
+                    "学习率", 
+                    min_value=0.0001, 
+                    max_value=0.1, 
+                    value=config.get('ae_learning_rate', 0.001),
+                    format="%.4f"
+                )
+            
+            with ae_col2:
+                config['ae_batch_size'] = st.number_input(
+                    "批次大小", 
+                    min_value=0, 
+                    max_value=256, 
+                    value=config.get('ae_batch_size', 0),
+                    help="0表示自动确定"
+                )
+                
+                config['ae_device'] = st.selectbox(
+                    "计算设备",
+                    options=['auto', 'cpu', 'cuda'],
+                    index=['auto', 'cpu', 'cuda'].index(config.get('ae_device', 'auto'))
+                )
+        else:
+            st.markdown("#### 🔬 Autoencoder参数")
+            st.info("Autoencoder分析已禁用")
+    
     # 主界面
+    st.markdown("---")
     col1, col2 = st.columns([2, 1])
     
     with col1:
