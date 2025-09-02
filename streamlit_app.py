@@ -97,7 +97,17 @@ def load_default_config():
         'ae_enabled': True,
         'skip_ae_training': False,
         'latent_dims': [5, 10, 15, 20],
-        'model_types': ['standard', 'vae']
+        'model_types': ['standard', 'vae'],
+        # POD参数
+        'pod_modes': [10, 20, 30, 40],
+        'energy_threshold': 95.0,
+        'num_modes_visualize': 10,
+        'pod_reconstruct_num': 0,
+        # Autoencoder训练参数
+        'ae_epochs': 200,
+        'ae_device': 'auto',
+        'ae_learning_rate': 0.001,
+        'ae_batch_size': 0
     }
 
 def save_config(config, filename="streamlit_config.json"):
@@ -125,8 +135,24 @@ def run_analysis(config):
         cmd.extend(['--num_models', str(config['num_models'])])
         cmd.extend(['--num_train', ','.join(map(str, config['num_train']))])
         
-        if config.get('skip_ae_training', False):
-            cmd.append('--skip_ae_training')
+        # POD参数
+        if config.get('pod_enabled', True):
+            cmd.extend(['--pod_modes', ','.join(map(str, config.get('pod_modes', [10, 20, 30, 40])))])
+            cmd.extend(['--energy_threshold', str(config.get('energy_threshold', 95.0))])
+            cmd.extend(['--num_modes_visualize', str(config.get('num_modes_visualize', 10))])
+            cmd.extend(['--pod_reconstruct_num', str(config.get('pod_reconstruct_num', 0))])
+        
+        # Autoencoder参数
+        if config.get('ae_enabled', True):
+            cmd.extend(['--latent_dims', ','.join(map(str, config.get('latent_dims', [5, 10, 15, 20])))])
+            cmd.extend(['--model_types', ','.join(config.get('model_types', ['standard', 'vae']))])
+            cmd.extend(['--ae_epochs', str(config.get('ae_epochs', 200))])
+            cmd.extend(['--ae_device', config.get('ae_device', 'auto')])
+            cmd.extend(['--ae_learning_rate', str(config.get('ae_learning_rate', 0.001))])
+            cmd.extend(['--ae_batch_size', str(config.get('ae_batch_size', 0))])
+            
+            if config.get('skip_ae_training', False):
+                cmd.append('--skip_ae_training')
             
         # 运行命令
         process = subprocess.Popen(
@@ -204,13 +230,58 @@ def main():
     
     # 算法配置
     st.sidebar.markdown("### 🧠 算法配置")
-    config['pod_enabled'] = st.sidebar.checkbox("启用POD分析", value=True)
-    config['ae_enabled'] = st.sidebar.checkbox("启用Autoencoder分析", value=True)
-    config['skip_ae_training'] = st.sidebar.checkbox("跳过AE重训练", value=False)
+    config['pod_enabled'] = st.sidebar.checkbox("启用POD分析", value=config.get('pod_enabled', True))
+    config['ae_enabled'] = st.sidebar.checkbox("启用Autoencoder分析", value=config.get('ae_enabled', True))
+    config['skip_ae_training'] = st.sidebar.checkbox("跳过AE重训练", value=config.get('skip_ae_training', False))
+    
+    # POD参数
+    if config['pod_enabled']:
+        st.sidebar.markdown("### 📐 POD参数")
+        
+        # POD模态数量
+        pod_modes_str = st.sidebar.text_input(
+            "POD模态数量 (逗号分隔)", 
+            value=','.join(map(str, config.get('pod_modes', [10, 20, 30, 40]))),
+            help="指定要分析的POD模态数量列表"
+        )
+        try:
+            config['pod_modes'] = [int(x.strip()) for x in pod_modes_str.split(',')]
+        except:
+            config['pod_modes'] = [10, 20, 30, 40]
+            
+        # 能量阈值
+        config['energy_threshold'] = st.sidebar.slider(
+            "能量阈值 (%)", 
+            min_value=80.0, 
+            max_value=99.9, 
+            value=config.get('energy_threshold', 95.0),
+            step=0.1,
+            help="自动确定模态数量的能量阈值"
+        )
+        
+        # 可视化模态数量
+        config['num_modes_visualize'] = st.sidebar.number_input(
+            "可视化模态数", 
+            min_value=1, 
+            max_value=50, 
+            value=config.get('num_modes_visualize', 10),
+            help="在图表中显示的POD模态数量"
+        )
+        
+        # 重建模态数量
+        config['pod_reconstruct_num'] = st.sidebar.number_input(
+            "重建使用的模态数", 
+            min_value=0, 
+            max_value=100, 
+            value=config.get('pod_reconstruct_num', 0),
+            help="0表示使用能量阈值自动确定"
+        )
     
     # Autoencoder参数
     if config['ae_enabled']:
         st.sidebar.markdown("### 🔬 Autoencoder参数")
+        
+        # 基础参数
         latent_dims_str = st.sidebar.text_input(
             "隐空间维度 (逗号分隔)", 
             value=','.join(map(str, config.get('latent_dims', [5, 10, 15, 20])))
@@ -225,6 +296,37 @@ def main():
             options=['standard', 'vae'],
             default=config.get('model_types', ['standard', 'vae'])
         )
+        
+        # 训练参数
+        with st.sidebar.expander("🎛️ 高级训练参数"):
+            config['ae_epochs'] = st.sidebar.number_input(
+                "训练轮数", 
+                min_value=50, 
+                max_value=1000, 
+                value=config.get('ae_epochs', 200)
+            )
+            
+            config['ae_learning_rate'] = st.sidebar.number_input(
+                "学习率", 
+                min_value=0.0001, 
+                max_value=0.1, 
+                value=config.get('ae_learning_rate', 0.001),
+                format="%.4f"
+            )
+            
+            config['ae_batch_size'] = st.sidebar.number_input(
+                "批次大小", 
+                min_value=0, 
+                max_value=256, 
+                value=config.get('ae_batch_size', 0),
+                help="0表示自动确定"
+            )
+            
+            config['ae_device'] = st.sidebar.selectbox(
+                "计算设备",
+                options=['auto', 'cpu', 'cuda'],
+                index=['auto', 'cpu', 'cuda'].index(config.get('ae_device', 'auto'))
+            )
     
     # 保存配置
     if st.sidebar.button("💾 保存配置"):
@@ -247,8 +349,9 @@ def main():
         with col1_2:
             st.metric("训练集大小", f"{len(config['num_train'])} 个", 
                      delta=f"最大: {max(config['num_train']) if config['num_train'] else 0}")
-            if config['ae_enabled']:
-                st.metric("隐空间维度", f"{len(config['latent_dims'])} 个")
+            if config['pod_enabled']:
+                st.metric("POD模态数", f"{len(config.get('pod_modes', []))} 个",
+                         delta=f"能量阈值: {config.get('energy_threshold', 95)}%")
                 
         with col1_3:
             algorithms = []
@@ -259,7 +362,8 @@ def main():
             st.metric("算法", f"{len(algorithms)} 个", delta=" + ".join(algorithms))
             
             if config['ae_enabled']:
-                st.metric("AE模型类型", f"{len(config['model_types'])} 个")
+                st.metric("AE隐空间", f"{len(config.get('latent_dims', []))} 个维度",
+                         delta=f"{len(config.get('model_types', []))} 种模型")
     
     with col2:
         st.markdown("### 🚀 运行控制")
