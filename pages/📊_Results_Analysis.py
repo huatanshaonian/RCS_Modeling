@@ -309,7 +309,7 @@ def main():
                     # 显示能量分析图
                     energy_fig = plot_pod_energy_analysis(pod_results['eigenvalues'])
                     if energy_fig:
-                        st.plotly_chart(energy_fig, use_container_width=True)
+                        st.plotly_chart(energy_fig, width='stretch')
                     
                     # 显示数值统计
                     col1, col2, col3, col4 = st.columns(4)
@@ -346,12 +346,12 @@ def main():
                     }
                     for config in ae_results['configs']
                 ])
-                st.dataframe(configs_df, use_container_width=True)
+                st.dataframe(configs_df, width='stretch')
                 
                 # 隐空间分析图
                 latent_fig = plot_latent_space_analysis(ae_results['configs'])
                 if latent_fig:
-                    st.plotly_chart(latent_fig, use_container_width=True)
+                    st.plotly_chart(latent_fig, width='stretch')
                     
             else:
                 st.info("Autoencoder结果不可用")
@@ -432,7 +432,7 @@ def main():
                             height=400
                         )
                         
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width='stretch')
                 
             else:
                 st.info("需要POD和Autoencoder结果才能进行对比分析")

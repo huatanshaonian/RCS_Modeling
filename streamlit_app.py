@@ -14,7 +14,6 @@ from plotly.subplots import make_subplots
 import json
 import os
 import subprocess
-import threading
 import time
 from pathlib import Path
 import sys
@@ -123,89 +122,142 @@ def load_config(filename="streamlit_config.json"):
     except:
         return load_default_config()
 
-def run_analysis(config):
-    """运行分析的后台函数"""
+def run_analysis_command(config):
+    """生成分析命令"""
+    # 确保使用当前环境的Python
+    import sys
+    python_executable = sys.executable
+    cmd = [python_executable, 'run.py']
+    cmd.extend(['--params_path', config['params_path']])
+    cmd.extend(['--rcs_dir', config['rcs_dir']])
+    cmd.extend(['--output_dir', config['output_dir']])
+    
+    # 处理频率参数 - 根据选择生成正确的参数
+    frequencies = config['frequency']
+    if len(frequencies) == 2 and '1.5G' in frequencies and '3G' in frequencies:
+        cmd.extend(['--freq', 'both'])
+    elif len(frequencies) == 1:
+        cmd.extend(['--freq', frequencies[0]])
+    else:
+        # 默认使用both，或者取第一个
+        freq_value = 'both' if len(frequencies) > 1 else (frequencies[0] if frequencies else '1.5G')
+        cmd.extend(['--freq', freq_value])
+    
+    cmd.extend(['--num_models', str(config['num_models'])])
+    cmd.extend(['--num_train', ','.join(map(str, config['num_train']))])
+    
+    # POD参数
+    if config.get('pod_enabled', True):
+        cmd.extend(['--pod_modes', ','.join(map(str, config.get('pod_modes', [10, 20, 30, 40])))])
+        cmd.extend(['--energy_threshold', str(config.get('energy_threshold', 95.0))])
+        cmd.extend(['--num_modes_visualize', str(config.get('num_modes_visualize', 10))])
+        cmd.extend(['--pod_reconstruct_num', str(config.get('pod_reconstruct_num', 0))])
+    
+    # Autoencoder参数
+    if config.get('ae_enabled', True):
+        cmd.extend(['--latent_dims', ','.join(map(str, config.get('latent_dims', [5, 10, 15, 20])))])
+        cmd.extend(['--model_types', ','.join(config.get('model_types', ['standard', 'vae']))])
+        cmd.extend(['--ae_epochs', str(config.get('ae_epochs', 200))])
+        cmd.extend(['--ae_device', config.get('ae_device', 'auto')])
+        cmd.extend(['--ae_learning_rate', str(config.get('ae_learning_rate', 0.001))])
+        cmd.extend(['--ae_batch_size', str(config.get('ae_batch_size', 0))])
+        
+        if config.get('skip_ae_training', False):
+            cmd.append('--skip_ae_training')
+    
+    return cmd
+
+def read_log_file_updates():
+    """从日志文件读取新的日志行"""
+    if not st.session_state.log_file_path or not os.path.exists(st.session_state.log_file_path):
+        return []
+    
+    new_logs = []
     try:
-        # 添加初始日志
-        st.session_state.logs.append("=== 开始分析 ===")
-        st.session_state.logs.append(f"当前工作目录: {os.getcwd()}")
-        
-        # 构建命令
-        cmd = ['python', 'run.py']
-        cmd.extend(['--params_path', config['params_path']])
-        cmd.extend(['--rcs_dir', config['rcs_dir']])
-        cmd.extend(['--output_dir', config['output_dir']])
-        cmd.extend(['--freq', ','.join(config['frequency'])])
-        cmd.extend(['--num_models', str(config['num_models'])])
-        cmd.extend(['--num_train', ','.join(map(str, config['num_train']))])
-        
-        # POD参数
-        if config.get('pod_enabled', True):
-            cmd.extend(['--pod_modes', ','.join(map(str, config.get('pod_modes', [10, 20, 30, 40])))])
-            cmd.extend(['--energy_threshold', str(config.get('energy_threshold', 95.0))])
-            cmd.extend(['--num_modes_visualize', str(config.get('num_modes_visualize', 10))])
-            cmd.extend(['--pod_reconstruct_num', str(config.get('pod_reconstruct_num', 0))])
-        
-        # Autoencoder参数
-        if config.get('ae_enabled', True):
-            cmd.extend(['--latent_dims', ','.join(map(str, config.get('latent_dims', [5, 10, 15, 20])))])
-            cmd.extend(['--model_types', ','.join(config.get('model_types', ['standard', 'vae']))])
-            cmd.extend(['--ae_epochs', str(config.get('ae_epochs', 200))])
-            cmd.extend(['--ae_device', config.get('ae_device', 'auto')])
-            cmd.extend(['--ae_learning_rate', str(config.get('ae_learning_rate', 0.001))])
-            cmd.extend(['--ae_batch_size', str(config.get('ae_batch_size', 0))])
+        with open(st.session_state.log_file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            # 从上次读取位置开始
+            f.seek(st.session_state.log_file_position)
+            new_content = f.read()
             
-            if config.get('skip_ae_training', False):
-                cmd.append('--skip_ae_training')
-        
-        # 记录命令
-        cmd_str = ' '.join(cmd)
-        st.session_state.logs.append(f"执行命令: {cmd_str}")
-        st.session_state.logs.append("--- 分析程序输出 ---")
-        
-        # 运行命令
-        process = subprocess.Popen(
-            cmd, 
-            stdout=subprocess.PIPE, 
-            stderr=subprocess.STDOUT,
-            universal_newlines=True,
-            bufsize=1,
-            cwd=os.getcwd()  # 明确指定工作目录
-        )
-        
-        # 实时读取输出
-        line_count = 0
-        for line in process.stdout:
-            line_count += 1
-            clean_line = line.strip()
-            if clean_line:  # 只添加非空行
-                st.session_state.logs.append(f"[{line_count:04d}] {clean_line}")
-            
-        # 等待进程完成
-        return_code = process.wait()
-        
-        if return_code == 0:
-            st.session_state.logs.append("=== 分析成功完成 ===")
-            st.session_state.analysis_complete = True
-        else:
-            st.session_state.logs.append(f"=== 分析失败，返回码: {return_code} ===")
-            
-        st.session_state.analysis_running = False
-        
-    except FileNotFoundError:
-        st.session_state.logs.append("错误: 找不到python或run.py文件")
-        st.session_state.logs.append("请确认您在正确的目录中运行此程序")
-        st.session_state.analysis_running = False
+            if new_content:
+                # 更新文件位置
+                st.session_state.log_file_position = f.tell()
+                
+                # 按行分割新内容
+                new_lines = new_content.strip().split('\n')
+                for line in new_lines:
+                    if line.strip():  # 忽略空行
+                        new_logs.append(line.strip())
     except Exception as e:
-        st.session_state.logs.append(f"分析过程中发生错误: {str(e)}")
-        import traceback
-        st.session_state.logs.append(f"详细错误信息: {traceback.format_exc()}")
-        st.session_state.analysis_running = False
+        new_logs.append(f"ERROR: 读取日志文件失败: {str(e)}")
+    
+    return new_logs
+
+def create_log_file():
+    """创建新的日志文件"""
+    timestamp = time.strftime('%Y%m%d_%H%M%S')
+    log_filename = f"streamlit_analysis_{timestamp}.log"
+    log_path = os.path.join(os.getcwd(), log_filename)
+    
+    # 创建日志文件
+    try:
+        with open(log_path, 'w', encoding='utf-8') as f:
+            f.write(f"=== RCS POD Analysis Log Started at {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
+            f.flush()
+        
+        st.session_state.log_file_path = log_path
+        st.session_state.log_file_position = 0
+        return log_path
+    except Exception as e:
+        st.error(f"创建日志文件失败: {str(e)}")
+        return None
 
 def main():
+    # 初始化session state
+    if 'logs' not in st.session_state:
+        st.session_state.logs = []
+    if 'analysis_running' not in st.session_state:
+        st.session_state.analysis_running = False
+    if 'analysis_complete' not in st.session_state:
+        st.session_state.analysis_complete = False
+    if 'analysis_process' not in st.session_state:
+        st.session_state.analysis_process = None
+    if 'last_log_check' not in st.session_state:
+        st.session_state.last_log_check = 0
+    if 'log_file_path' not in st.session_state:
+        st.session_state.log_file_path = None
+    if 'log_file_position' not in st.session_state:
+        st.session_state.log_file_position = 0
+    
     # 主标题
     st.markdown('<h1 class="main-header">📡 RCS POD Analysis Dashboard</h1>', 
                 unsafe_allow_html=True)
+    
+    # 环境信息显示（可折叠）
+    with st.expander("🔍 环境信息", expanded=False):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.text(f"Python路径: {sys.executable}")
+            st.text(f"Python版本: {sys.version.split()[0]}")
+            st.text(f"工作目录: {os.getcwd()}")
+        with col2:
+            # 检查关键包
+            try:
+                import torch
+                st.text(f"✅ PyTorch: {torch.__version__}")
+                st.text(f"✅ CUDA可用: {torch.cuda.is_available()}")
+            except ImportError:
+                st.text("❌ PyTorch: 未安装")
+            
+            try:
+                import pandas as pd
+                st.text(f"✅ Pandas: {pd.__version__}")
+            except ImportError:
+                st.text("❌ Pandas: 未安装")
+            
+            # 检查conda环境
+            conda_env = os.environ.get('CONDA_DEFAULT_ENV', 'Unknown')
+            st.text(f"Conda环境: {conda_env}")
     
     # 侧边栏配置
     st.sidebar.markdown("## ⚙️ 分析配置")
@@ -387,6 +439,14 @@ def main():
             st.markdown("#### 🔬 Autoencoder参数")
             st.info("Autoencoder分析已禁用")
     
+    # 保存详细参数配置
+    st.markdown("---")
+    col_save1, col_save2, col_save3 = st.columns([1, 2, 1])
+    with col_save2:
+        if st.button("💾 保存所有参数配置", width='stretch'):
+            save_config(config)
+            st.success("所有参数配置已保存!")
+    
     # 主界面
     st.markdown("---")
     col1, col2 = st.columns([2, 1])
@@ -423,25 +483,148 @@ def main():
     with col2:
         st.markdown("### 🚀 运行控制")
         
-        # 运行按钮
-        if not st.session_state.analysis_running:
-            if st.button("▶️ 开始分析", type="primary", use_container_width=True):
-                # 验证配置
-                if not config['frequency']:
-                    st.error("请至少选择一个频率!")
-                elif config['ae_enabled'] and not config['model_types']:
-                    st.error("启用Autoencoder时请至少选择一个模型类型!")
-                else:
-                    st.session_state.analysis_running = True
-                    st.session_state.analysis_complete = False
-                    st.session_state.logs = []
-                    # 启动分析线程
-                    thread = threading.Thread(target=run_analysis, args=(config,))
-                    thread.daemon = True
-                    thread.start()
-                    st.rerun()
-        else:
-            st.button("⏳ 分析进行中...", disabled=True, use_container_width=True)
+        # 运行控制按钮
+        col_btn1, col_btn2 = st.columns(2)
+        
+        with col_btn1:
+            if not st.session_state.analysis_running:
+                if st.button("▶️ 开始分析", type="primary", width='stretch'):
+                    # 验证配置
+                    if not config['frequency']:
+                        st.error("请至少选择一个频率!")
+                    elif config['ae_enabled'] and not config['model_types']:
+                        st.error("启用Autoencoder时请至少选择一个模型类型!")
+                    else:
+                        # 创建日志文件
+                        log_file_path = create_log_file()
+                        if log_file_path is None:
+                            st.error("无法创建日志文件，请检查权限")
+                            return
+                        
+                        # 生成命令并显示
+                        cmd = run_analysis_command(config)
+                        cmd_str = ' '.join(cmd)
+                        
+                        # 初始化日志
+                        st.session_state.logs = []
+                        st.session_state.logs.append("=== 开始分析 ===")
+                        st.session_state.logs.append(f"当前工作目录: {os.getcwd()}")
+                        st.session_state.logs.append(f"日志文件: {log_file_path}")
+                        st.session_state.logs.append(f"执行命令: {cmd_str}")
+                        st.session_state.logs.append("--- 分析程序输出 ---")
+                        
+                        # 启动后台进程，输出重定向到日志文件
+                        try:
+                            import subprocess
+                            
+                            # 打开日志文件用于写入
+                            log_file = open(log_file_path, 'a', encoding='utf-8', buffering=1)
+                            
+                            # 写入命令信息
+                            log_file.write(f"=== 开始分析 ===\n")
+                            log_file.write(f"当前工作目录: {os.getcwd()}\n")
+                            log_file.write(f"执行命令: {cmd_str}\n")
+                            log_file.write("--- 分析程序输出 ---\n")
+                            log_file.flush()
+                            
+                            # 启动进程，输出到日志文件
+                            process = subprocess.Popen(
+                                cmd,
+                                cwd=os.getcwd(),
+                                stdout=log_file,
+                                stderr=subprocess.STDOUT,
+                                universal_newlines=True,
+                                bufsize=1
+                            )
+                            
+                            st.session_state.analysis_process = process
+                            st.session_state.analysis_running = True
+                            st.session_state.analysis_complete = False
+                            st.session_state.last_log_check = 0
+                            
+                            # 重置文件读取位置到当前位置
+                            with open(log_file_path, 'r', encoding='utf-8') as f:
+                                f.seek(0, 2)  # 移动到文件末尾
+                                st.session_state.log_file_position = f.tell()
+                            
+                            st.success(f"分析已启动！日志文件: {os.path.basename(log_file_path)}")
+                            st.rerun()
+                            
+                        except Exception as e:
+                            error_msg = f"启动分析进程失败: {str(e)}"
+                            st.session_state.logs.append(error_msg)
+                            st.error(f"启动失败: {str(e)}")
+                            # 尝试写入错误到日志文件
+                            try:
+                                with open(log_file_path, 'a', encoding='utf-8') as f:
+                                    f.write(f"{error_msg}\n")
+                            except:
+                                pass
+            else:
+                st.button("⏳ 分析进行中...", disabled=True, width='stretch')
+        
+        with col_btn2:
+            if st.session_state.analysis_running and st.session_state.analysis_process:
+                if st.button("⏹️ 停止分析", type="secondary", width='stretch'):
+                    try:
+                        process = st.session_state.analysis_process
+                        if process and process.poll() is None:  # 进程还在运行
+                            process.terminate()
+                            time.sleep(1)
+                            if process.poll() is None:  # 如果还没结束，强制杀死
+                                process.kill()
+                            st.session_state.logs.append("=== 分析已被停止 ===")
+                            st.session_state.analysis_running = False
+                            st.session_state.analysis_process = None
+                            st.success("分析已停止")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"停止失败: {str(e)}")
+            else:
+                st.button("⏹️ 停止分析", disabled=True, width='stretch')
+        
+        # 实时检查进程状态和从日志文件读取输出
+        if st.session_state.analysis_running and st.session_state.analysis_process:
+            process = st.session_state.analysis_process
+            
+            # 从日志文件读取新内容
+            new_logs = read_log_file_updates()
+            if new_logs:
+                for line in new_logs:
+                    st.session_state.last_log_check += 1
+                    st.session_state.logs.append(f"[{st.session_state.last_log_check:04d}] {line}")
+            
+            # 检查进程是否结束
+            return_code = process.poll()
+            if return_code is not None:
+                # 进程已结束，等待一下以确保所有输出都写入文件
+                time.sleep(1)
+                
+                # 读取剩余的日志
+                remaining_logs = read_log_file_updates()
+                if remaining_logs:
+                    for line in remaining_logs:
+                        st.session_state.last_log_check += 1
+                        st.session_state.logs.append(f"[{st.session_state.last_log_check:04d}] {line}")
+                
+                # 写入结束标记到日志文件
+                try:
+                    if st.session_state.log_file_path:
+                        with open(st.session_state.log_file_path, 'a', encoding='utf-8') as f:
+                            if return_code == 0:
+                                f.write("=== 分析成功完成 ===\n")
+                                st.session_state.logs.append("=== 分析成功完成 ===")
+                                st.session_state.analysis_complete = True
+                            else:
+                                f.write(f"=== 分析失败，返回码: {return_code} ===\n")
+                                st.session_state.logs.append(f"=== 分析失败，返回码: {return_code} ===")
+                                st.session_state.analysis_complete = False
+                            f.flush()
+                except:
+                    pass
+                
+                st.session_state.analysis_running = False
+                st.session_state.analysis_process = None
             
         # 状态指示器
         if st.session_state.analysis_running:
@@ -456,33 +639,158 @@ def main():
             )
         
         # 清空日志按钮
-        if st.button("🗑️ 清空日志", use_container_width=True):
+        if st.button("🗑️ 清空日志", width='stretch'):
             st.session_state.logs = []
             st.rerun()
     
     # 日志显示
     st.markdown("### 📝 运行日志")
     
+    # 显示当前日志文件信息
+    if st.session_state.log_file_path:
+        log_file_name = os.path.basename(st.session_state.log_file_path)
+        file_size = 0
+        try:
+            file_size = os.path.getsize(st.session_state.log_file_path) / 1024  # KB
+        except:
+            pass
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.info(f"📄 日志文件: {log_file_name}")
+        with col2:
+            st.info(f"📊 文件大小: {file_size:.1f} KB")
+        with col3:
+            if st.button("📂 在文件夹中显示"):
+                import subprocess
+                try:
+                    if os.name == 'nt':  # Windows
+                        subprocess.run(['explorer', '/select,', st.session_state.log_file_path])
+                    else:  # Linux/Mac
+                        subprocess.run(['xdg-open', os.path.dirname(st.session_state.log_file_path)])
+                except:
+                    st.error("无法打开文件夹")
+    
     if st.session_state.logs:
-        # 显示最新的日志
+        # 日志状态信息
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("总日志行数", len(st.session_state.logs))
+        with col2:
+            error_count = len([log for log in st.session_state.logs if "ERROR" in log or "失败" in log])
+            st.metric("错误数", error_count, delta="❌" if error_count > 0 else "✅")
+        with col3:
+            if st.session_state.analysis_running:
+                st.metric("状态", "运行中", delta="🔄")
+            elif st.session_state.analysis_complete:
+                st.metric("状态", "已完成", delta="✅")
+            else:
+                st.metric("状态", "待运行", delta="⏸️")
+        
+        # 日志控制按钮
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            show_all_logs = st.checkbox("显示全部日志", value=False)
+        with col2:
+            if st.button("🔄 刷新", disabled=st.session_state.analysis_running):
+                st.rerun()
+        with col3:
+            if st.button("🗑️ 清空", disabled=st.session_state.analysis_running):
+                st.session_state.logs = []
+                st.rerun()
+        
+        # 显示日志
         log_container = st.container()
         with log_container:
-            # 只显示最后50行日志
-            recent_logs = st.session_state.logs[-50:] if len(st.session_state.logs) > 50 else st.session_state.logs
-            log_text = '\n'.join(recent_logs)
+            if show_all_logs:
+                display_logs = st.session_state.logs
+                max_height = 600
+            else:
+                # 只显示最后100行日志以提高性能
+                display_logs = st.session_state.logs[-100:] if len(st.session_state.logs) > 100 else st.session_state.logs
+                max_height = 400
+            
+            log_text = '\n'.join(display_logs)
+            
+            # 使用更好的样式显示日志
+            st.markdown("""
+            <style>
+            .log-text-area {
+                font-family: 'Courier New', monospace !important;
+                font-size: 12px !important;
+                background-color: #0f0f0f !important;
+                color: #00ff00 !important;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
+            # 如果有错误，高亮显示
+            if error_count > 0:
+                # 处理日志文本，高亮错误行
+                highlighted_logs = []
+                for log in display_logs:
+                    if "ERROR" in log or "失败" in log:
+                        highlighted_logs.append(f"🔴 {log}")
+                    elif "WARNING" in log or "警告" in log:
+                        highlighted_logs.append(f"🟡 {log}")
+                    elif "成功" in log or "完成" in log:
+                        highlighted_logs.append(f"🟢 {log}")
+                    else:
+                        highlighted_logs.append(log)
+                log_text = '\n'.join(highlighted_logs)
+            
             st.text_area(
                 "实时日志输出", 
                 value=log_text, 
-                height=300,
-                disabled=True
+                height=max_height,
+                disabled=True,
+                key=f"log_display_{len(st.session_state.logs)}"  # 动态key确保更新
             )
             
-        # 自动滚动到底部
+            # 显示最新日志行的简要信息
+            if st.session_state.logs:
+                latest_log = st.session_state.logs[-1]
+                if len(latest_log) > 80:
+                    latest_log = latest_log[:80] + "..."
+                st.caption(f"最新: {latest_log}")
+        
+        # 下载日志功能
+        col1, col2 = st.columns(2)
+        with col1:
+            if len(st.session_state.logs) > 0:
+                log_content = '\n'.join(st.session_state.logs)
+                st.download_button(
+                    label="📥 下载界面日志",
+                    data=log_content,
+                    file_name=f"streamlit_log_{time.strftime('%Y%m%d_%H%M%S')}.txt",
+                    mime="text/plain"
+                )
+        
+        with col2:
+            if st.session_state.log_file_path and os.path.exists(st.session_state.log_file_path):
+                try:
+                    with open(st.session_state.log_file_path, 'r', encoding='utf-8') as f:
+                        file_content = f.read()
+                    st.download_button(
+                        label="📥 下载完整日志文件",
+                        data=file_content,
+                        file_name=os.path.basename(st.session_state.log_file_path),
+                        mime="text/plain"
+                    )
+                except:
+                    st.warning("无法读取日志文件")
+        
+        # 如果分析正在运行，自动刷新
         if st.session_state.analysis_running:
-            time.sleep(1)
+            # 减少刷新频率以提高性能
+            time.sleep(2)
             st.rerun()
     else:
         st.info("📋 运行日志将在这里显示...")
+        if st.session_state.analysis_running:
+            st.info("🔄 分析正在启动，请稍等...")
+            time.sleep(1)
+            st.rerun()
     
     # 结果分析区域
     if st.session_state.analysis_complete:
