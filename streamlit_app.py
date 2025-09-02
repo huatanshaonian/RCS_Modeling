@@ -204,6 +204,29 @@ def read_log_file_updates():
     
     return new_logs
 
+class FlushingLogFile:
+    """自动刷新的日志文件包装器，确保每次写入都立即刷新到磁盘"""
+    def __init__(self, file_path, mode='a', encoding='utf-8'):
+        self.file = open(file_path, mode, encoding=encoding, buffering=1)
+        
+    def write(self, text):
+        self.file.write(text)
+        self.file.flush()  # 立即刷新到磁盘
+        os.fsync(self.file.fileno())  # 强制操作系统立即写入磁盘
+        
+    def flush(self):
+        self.file.flush()
+        os.fsync(self.file.fileno())
+        
+    def close(self):
+        self.file.close()
+        
+    def __enter__(self):
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
 def create_log_file():
     """创建新的日志文件"""
     import time  # 确保time模块在函数作用域中可用
@@ -598,28 +621,28 @@ def main():
                         try:
                             import subprocess
                             
-                            # 打开日志文件用于写入
-                            log_file = open(log_file_path, 'a', encoding='utf-8', buffering=1)
+                            # 使用自动刷新的日志文件包装器
+                            log_file = FlushingLogFile(log_file_path, 'a', 'utf-8')
                             
-                            # 写入命令信息
+                            # 写入命令信息（每次写入都会自动立即刷新到磁盘）
                             log_file.write(f"=== 开始分析 ===\n")
-                            log_file.write(f"当前工作目录: {os.getcwd()}\n")
+                            log_file.write(f"当前工作目录: {os.getcwd()}\n") 
                             log_file.write(f"执行命令: {cmd_str}\n")
                             log_file.write("--- 分析程序输出 ---\n")
-                            log_file.flush()
                             
                             # 启动进程，输出到日志文件
-                            # 设置中文编码环境变量
+                            # 设置中文编码环境变量和无缓冲输出
                             env = os.environ.copy()
                             env['PYTHONIOENCODING'] = 'utf-8'
+                            env['PYTHONUNBUFFERED'] = '1'  # 强制无缓冲输出
                             
                             process = subprocess.Popen(
                                 cmd,
                                 cwd=os.getcwd(),
-                                stdout=log_file,
+                                stdout=log_file.file,  # 使用包装器内部的文件对象
                                 stderr=subprocess.STDOUT,
                                 universal_newlines=True,
-                                bufsize=1,
+                                bufsize=0,  # 无缓冲，立即写入
                                 env=env,
                                 encoding='utf-8',
                                 errors='replace'
@@ -703,7 +726,7 @@ def main():
                     st.info("⏳ 等待新日志输出...")
                 
                 # 使用更短的延迟，提高响应速度
-                time.sleep(0.5)
+                time.sleep(0.2)  # 减少到0.2秒，提高实时性
                 st.rerun()
             
             # 检查进程是否结束
@@ -947,14 +970,22 @@ def main():
         if st.session_state.analysis_running:
             # 减少刷新频率以提高性能
             import time
-            time.sleep(2)
+            time.sleep(0.3)  # 加快刷新速度，提高响应性
             st.rerun()
     else:
-        st.info("📋 运行日志将在这里显示...")
+        # 始终显示日志输入框，即使没有日志
+        st.text_area(
+            "📋 实时日志流",
+            value="等待开始分析...\n点击上方'🚀 开始分析'按钮开始运行。",
+            height=400,
+            disabled=True,
+            help="分析开始后，日志将在这里实时显示"
+        )
+        
         if st.session_state.analysis_running:
             st.info("🔄 分析正在启动，请稍等...")
             import time
-            time.sleep(1)
+            time.sleep(0.3)  # 加快启动检查速度
             st.rerun()
     
     # 结果分析区域
