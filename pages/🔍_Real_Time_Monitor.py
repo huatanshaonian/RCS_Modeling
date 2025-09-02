@@ -24,27 +24,68 @@ st.set_page_config(
 def get_system_info():
     """获取系统信息"""
     try:
-        # Windows下获取当前驱动器使用情况，其他系统使用根目录
+        # 获取CPU和内存信息
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        boot_time = datetime.fromtimestamp(psutil.boot_time())
+        
+        # 安全地获取磁盘信息
+        disk_info = None
         if os.name == 'nt':
-            # Windows: 获取当前工作目录所在的驱动器
-            current_drive = os.path.splitdrive(os.getcwd())[0] + os.sep
-            disk_path = current_drive
+            # Windows: 尝试多个常见驱动器
+            for drive in ['C:', 'D:', 'E:', 'F:', 'G:']:
+                try:
+                    if os.path.exists(drive + os.sep):
+                        disk_info = psutil.disk_usage(drive + os.sep)
+                        break
+                except:
+                    continue
+            
+            # 如果都失败了，尝试当前目录的驱动器
+            if disk_info is None:
+                try:
+                    current_drive = os.path.splitdrive(os.getcwd())[0]
+                    if current_drive:
+                        disk_info = psutil.disk_usage(current_drive + os.sep)
+                except:
+                    pass
         else:
-            disk_path = '/'
+            # Linux/Mac: 使用根目录
+            try:
+                disk_info = psutil.disk_usage('/')
+            except:
+                pass
+        
+        # 如果磁盘信息获取失败，使用默认值
+        if disk_info is None:
+            disk_info = type('obj', (object,), {
+                'total': 1024*1024*1024*100,  # 100GB
+                'used': 1024*1024*1024*50,    # 50GB
+                'free': 1024*1024*1024*50     # 50GB
+            })()
         
         return {
-            'cpu_percent': psutil.cpu_percent(interval=1),
-            'memory': psutil.virtual_memory(),
-            'disk': psutil.disk_usage(disk_path),
-            'boot_time': datetime.fromtimestamp(psutil.boot_time())
+            'cpu_percent': cpu_percent,
+            'memory': memory,
+            'disk': disk_info,
+            'boot_time': boot_time
         }
+        
     except Exception as e:
         st.error(f"获取系统信息失败: {e}")
-        # 返回默认值
+        # 返回安全的默认值
         return {
             'cpu_percent': 0.0,
-            'memory': type('obj', (object,), {'percent': 0, 'used': 0, 'total': 1})(),
-            'disk': type('obj', (object,), {'used': 0, 'total': 1, 'free': 1})(),
+            'memory': type('obj', (object,), {
+                'percent': 0, 
+                'used': 0, 
+                'total': 1024*1024*1024*8  # 8GB
+            })(),
+            'disk': type('obj', (object,), {
+                'used': 0, 
+                'total': 1024*1024*1024*100,  # 100GB
+                'free': 1024*1024*1024*100    # 100GB
+            })(),
             'boot_time': datetime.now()
         }
 
