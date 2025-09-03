@@ -168,11 +168,13 @@ def run_analysis_command(config):
     return cmd
 
 def read_log_file_updates():
-    """从日志文件读取新的日志行"""
+    """从日志文件读取新的日志行，并检测程序结束标志"""
     if not st.session_state.log_file_path or not os.path.exists(st.session_state.log_file_path):
         return []
     
     new_logs = []
+    completion_detected = False
+    
     try:
         # 使用utf-8编码读取文件（简化编码处理）
         with open(st.session_state.log_file_path, 'r', encoding='utf-8', errors='replace') as f:
@@ -195,6 +197,25 @@ def read_log_file_updates():
                 # 按行分割新内容，过滤空行
                 new_lines = [line.strip() for line in new_content.split('\n') if line.strip()]
                 new_logs.extend(new_lines)
+                
+                # 检测程序完成标志
+                for line in new_lines:
+                    # 检测多种完成标志
+                    completion_keywords = [
+                        "分析完成！",
+                        "总运行时间:",
+                        "POD和模态分析完成。结果保存在",
+                        "结果保存在: ./results"
+                    ]
+                    
+                    for keyword in completion_keywords:
+                        if keyword in line:
+                            completion_detected = True
+                            st.session_state.program_completion_detected = True
+                            break
+                    
+                    if completion_detected:
+                        break
                 
     except Exception as e:
         new_logs.append(f"ERROR: 读取日志文件失败: {str(e)}")
@@ -657,6 +678,11 @@ def main():
                             import time  # 确保time模块可用
                             st.session_state.analysis_start_time = time.time()  # 记录开始时间
                             
+                            # 重置程序完成检测标志
+                            st.session_state.program_completion_detected = False
+                            if hasattr(st.session_state, 'completion_detected_time'):
+                                delattr(st.session_state, 'completion_detected_time')
+                            
                             # 设置文件读取位置为开头，以便读取所有日志
                             st.session_state.log_file_position = 0
                             
@@ -736,28 +762,59 @@ def main():
                     else:
                         st.warning("日志文件不存在或路径错误")
                 
-                # 智能延迟：根据最后更新时间调整刷新频率
+                # 智能延迟：大幅降低刷新频率减少闪烁
                 import time
                 current_time = time.time()
                 if hasattr(st.session_state, 'last_log_update_time'):
                     time_since_last_update = current_time - st.session_state.last_log_update_time
-                    if time_since_last_update < 10:  # 最近10秒有更新，快速检查
-                        time.sleep(0.5)
-                    elif time_since_last_update < 30:  # 10-30秒无更新，中等频率
-                        time.sleep(2.0) 
-                    else:  # 30秒以上无更新，低频率检查
-                        time.sleep(5.0)
+                    if time_since_last_update < 30:  # 最近30秒有更新，中等频率
+                        time.sleep(2.0)
+                    elif time_since_last_update < 60:  # 30-60秒无更新，低频率
+                        time.sleep(5.0) 
+                    else:  # 60秒以上无更新，很低频率
+                        time.sleep(10.0)
                 else:
-                    time.sleep(1.0)  # 默认频率
+                    time.sleep(3.0)  # 默认频率降低到3秒
                     
                 st.rerun()
             
-            # 检查进程是否结束
+            # 检查程序完成检测和进程状态
             return_code = process.poll()
+            
+            # 如果通过日志检测到程序完成，但进程仍在运行，等待进程自然结束
+            program_completed_by_log = getattr(st.session_state, 'program_completion_detected', False)
+            
+            import time
+            current_time = time.time()
+            if hasattr(st.session_state, 'analysis_start_time'):
+                elapsed_time = current_time - st.session_state.analysis_start_time
+                elapsed_minutes = elapsed_time / 60
+                
+                # 在状态显示中添加运行时间信息
+                with log_status_placeholder.container():
+                    if program_completed_by_log and return_code is None:
+                        st.warning(f"🎯 程序已完成，等待进程结束... (已运行 {elapsed_minutes:.1f} 分钟) - PID: {process.pid}")
+                        # 如果日志检测到完成超过30秒但进程还没结束，强制结束
+                        if not hasattr(st.session_state, 'completion_detected_time'):
+                            st.session_state.completion_detected_time = current_time
+                        elif current_time - st.session_state.completion_detected_time > 30:
+                            st.warning("程序完成超过30秒但进程未结束，强制结束进程")
+                            try:
+                                process.terminate()
+                                time.sleep(2)
+                                if process.poll() is None:
+                                    process.kill()
+                                return_code = 0  # 假设成功完成
+                            except:
+                                return_code = 1
+                    elif return_code is None:  # 仍在运行
+                        st.info(f"🔄 进程运行中 (已运行 {elapsed_minutes:.1f} 分钟) - PID: {process.pid}")
+                    else:
+                        st.success(f"✅ 进程已结束 (返回码: {return_code}) - 运行时间: {elapsed_minutes:.1f} 分钟")
+            
             if return_code is not None:
                 # 进程已结束，等待一下以确保所有输出都写入文件
-                import time
-                time.sleep(1)
+                time.sleep(2)  # 增加等待时间确保输出完全写入
                 
                 # 读取剩余的日志
                 remaining_logs = read_log_file_updates()
@@ -771,19 +828,32 @@ def main():
                     if st.session_state.log_file_path:
                         with open(st.session_state.log_file_path, 'a', encoding='utf-8') as f:
                             if return_code == 0:
-                                f.write("=== 分析成功完成 ===\n")
-                                st.session_state.logs.append("=== 分析成功完成 ===")
+                                end_msg = f"=== 分析成功完成 (返回码: {return_code}) ==="
+                                f.write(f"{end_msg}\n")
+                                st.session_state.logs.append(end_msg)
                                 st.session_state.analysis_complete = True
                             else:
-                                f.write(f"=== 分析失败，返回码: {return_code} ===\n")
-                                st.session_state.logs.append(f"=== 分析失败，返回码: {return_code} ===")
+                                end_msg = f"=== 分析失败，返回码: {return_code} ==="
+                                f.write(f"{end_msg}\n")
+                                st.session_state.logs.append(end_msg)
                                 st.session_state.analysis_complete = False
                             f.flush()
-                except:
-                    pass
+                except Exception as e:
+                    error_msg = f"写入结束标记失败: {str(e)}"
+                    st.session_state.logs.append(error_msg)
                 
+                # 清理进程状态
                 st.session_state.analysis_running = False
                 st.session_state.analysis_process = None
+                
+                # 显示最终状态
+                if return_code == 0:
+                    st.success(f"🎉 分析成功完成！返回码: {return_code}")
+                else:
+                    st.error(f"❌ 分析失败，返回码: {return_code}")
+                    
+                # 最后刷新显示结束状态
+                st.rerun()
             
         # 状态指示器
         if st.session_state.analysis_running:
@@ -850,7 +920,7 @@ def main():
             st.metric("状态", "待运行", delta="⏸️")
         
         # 日志控制按钮
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             show_all_logs = st.checkbox("显示全部日志", value=False)
         with col2:
@@ -869,6 +939,66 @@ def main():
                 st.success("日志已刷新!")
                 st.rerun()
         with col3:
+            if st.button("🔍 检测进程状态"):
+                if st.session_state.analysis_process:
+                    process = st.session_state.analysis_process
+                    return_code = process.poll()
+                    program_completed_by_log = getattr(st.session_state, 'program_completion_detected', False)
+                    
+                    if return_code is not None:
+                        # 进程已经结束但状态未更新
+                        st.warning(f"⚠️ 检测到进程已结束 (返回码: {return_code})，正在更新状态...")
+                    elif program_completed_by_log:
+                        # 日志检测到完成但进程仍在运行
+                        st.warning(f"⚠️ 日志显示程序已完成但进程仍在运行 (PID: {process.pid})，尝试结束进程...")
+                        try:
+                            process.terminate()
+                            import time
+                            time.sleep(2)
+                            if process.poll() is None:
+                                process.kill()
+                            return_code = 0  # 假设成功完成
+                        except:
+                            return_code = 1
+                        st.success("✅ 已根据日志检测结果结束进程")
+                        
+                        # 手动触发结束处理
+                        import time
+                        time.sleep(1)
+                        
+                        # 读取剩余日志
+                        remaining_logs = read_log_file_updates()
+                        if remaining_logs:
+                            for line in remaining_logs:
+                                st.session_state.last_log_check += 1
+                                st.session_state.logs.append(f"[{st.session_state.last_log_check:04d}] {line}")
+                        
+                        # 写入结束标记
+                        try:
+                            if st.session_state.log_file_path:
+                                with open(st.session_state.log_file_path, 'a', encoding='utf-8') as f:
+                                    if return_code == 0:
+                                        end_msg = f"=== 手动检测: 分析成功完成 (返回码: {return_code}) ==="
+                                        st.session_state.analysis_complete = True
+                                    else:
+                                        end_msg = f"=== 手动检测: 分析失败，返回码: {return_code} ==="
+                                        st.session_state.analysis_complete = False
+                                    f.write(f"{end_msg}\n")
+                                    st.session_state.logs.append(end_msg)
+                                    f.flush()
+                        except:
+                            pass
+                        
+                        # 清理状态
+                        st.session_state.analysis_running = False
+                        st.session_state.analysis_process = None
+                        st.success("✅ 进程状态已更新!")
+                        st.rerun()
+                    else:
+                        st.info(f"🔄 进程仍在运行 (PID: {process.pid})")
+                else:
+                    st.info("ℹ️ 当前没有运行的进程")
+        with col4:
             if st.button("📂 打开日志文件"):
                 if st.session_state.log_file_path and os.path.exists(st.session_state.log_file_path):
                     import subprocess
@@ -876,7 +1006,7 @@ def main():
                         subprocess.run(['notepad.exe', st.session_state.log_file_path])
                     except:
                         st.error("无法打开日志文件")
-        with col4:
+        with col5:
             if st.button("🗑️ 清空", disabled=st.session_state.analysis_running):
                 st.session_state.logs = []
                 st.rerun()

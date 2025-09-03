@@ -190,6 +190,13 @@ class RCS_GUI:
         
         row = 0
         
+        # POD多模态对比分析
+        ttk.Label(pod_frame, text="POD多模态对比:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        ttk.Label(pod_frame, text="(逗号分隔)", font=('Arial', 8)).grid(row=row, column=2, sticky=tk.W, padx=(5, 0))
+        self.pod_vars['pod_modes'] = tk.StringVar(value="10,20,30,40")
+        ttk.Entry(pod_frame, textvariable=self.pod_vars['pod_modes'], width=40).grid(row=row, column=1, sticky=(tk.W, tk.E), pady=2, padx=(5, 0))
+        row += 1
+        
         # 能量覆盖阈值
         ttk.Label(pod_frame, text="能量覆盖阈值 (%):").grid(row=row, column=0, sticky=tk.W, pady=2)
         self.pod_vars['energy_threshold'] = tk.StringVar(value="95")
@@ -214,9 +221,10 @@ class RCS_GUI:
         
         # 添加说明
         info_text = """POD参数说明:
+• POD多模态对比: 指定要进行重建对比分析的POD模态数量列表
 • 能量覆盖阈值: 保留模态覆盖的总能量百分比
 • 可视化模态数量: 用于详细分析和可视化的模态数量
-• 这些参数需要修改源代码才能生效"""
+• POD重建模态数: 用于单次重建的模态数量 (0表示自动确定)"""
         
         info_label = ttk.Label(pod_frame, text=info_text, font=('Arial', 9), 
                               foreground='gray', justify=tk.LEFT)
@@ -473,6 +481,8 @@ class RCS_GUI:
             cmd.append("--skip_ae_training")
         
         # 添加POD参数
+        if self.pod_vars['pod_modes'].get():
+            cmd.extend(["--pod_modes", self.pod_vars['pod_modes'].get()])
         if self.pod_vars['energy_threshold'].get():
             cmd.extend(["--energy_threshold", self.pod_vars['energy_threshold'].get()])
         if self.pod_vars['num_modes_visualize'].get():

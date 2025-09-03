@@ -63,7 +63,7 @@ def calculate_pod_performance_by_modes(rcs_data, pod_modes, mean_rcs, mode_numbe
             'energy_ratio': energy_ratio
         }
         
-        print(f"POD {n_modes}模态: MSE={mse:.6f}, R²={r2:.6f}, 能量比={energy_ratio:.4f}")
+        print(f"POD {n_modes}模态: MSE={mse:.6f}, R^2={r2:.6f}, 能量比={energy_ratio:.4f}")
     
     return pod_performance
 
@@ -142,7 +142,7 @@ def comprehensive_comparison_analysis(ae_results, pod_data, rcs_train_data, outp
             'dimensions': config_results.get('latent_dim', 0),
             'mse': config_results.get('mse', float('nan')),
             'r2': config_results.get('r2', 0),
-            'energy_ratio': config_results.get('r2', 0)  # 使用R²作为能量保留的近似
+            'energy_ratio': config_results.get('r2', 0)  # 使用R^2作为能量保留的近似
         }
     
     # 3. 合并所有性能数据
@@ -201,7 +201,7 @@ def create_comprehensive_plots(all_performance, output_dir):
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
     fig.suptitle('POD vs Autoencoder 综合性能对比分析', fontsize=16, fontweight='bold')
     
-    # 1. 维度 vs R²分数对比
+    # 1. 维度 vs R^2分数对比
     ax1 = axes[0, 0]
     pod_mask = [perf['method'] == 'POD' for perf in all_performance.values() if not np.isnan(perf['mse'])]
     standard_mask = [perf['method'] == 'standard' for perf in all_performance.values() if not np.isnan(perf['mse'])]
@@ -227,8 +227,8 @@ def create_comprehensive_plots(all_performance, output_dir):
         ax1.plot(vae_dims, vae_r2, 'g^-', label='VAE', linewidth=2, markersize=8)
     
     ax1.set_xlabel('维度/模态数')
-    ax1.set_ylabel('R² 分数')
-    ax1.set_title('重构质量对比 (R²)')
+    ax1.set_ylabel('R^2 分数')
+    ax1.set_title('重构质量对比 (R^2)')
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     
@@ -255,7 +255,7 @@ def create_comprehensive_plots(all_performance, output_dir):
     ax2.grid(True, alpha=0.3)
     ax2.set_yscale('log')  # 使用对数坐标
     
-    # 3. 效率对比 (R² vs 维度)
+    # 3. 效率对比 (R^2 vs 维度)
     ax3 = axes[0, 2]
     for i, (method, dim, r2) in enumerate(zip(methods, dimensions, r2_values)):
         ax3.scatter(dim, r2, c=colors[i], marker=markers[i], s=100, alpha=0.7)
@@ -263,8 +263,8 @@ def create_comprehensive_plots(all_performance, output_dir):
                     textcoords='offset points', fontsize=8, alpha=0.8)
     
     ax3.set_xlabel('维度/模态数')
-    ax3.set_ylabel('R² 分数')
-    ax3.set_title('效率对比 (R² vs 复杂度)')
+    ax3.set_ylabel('R^2 分数')
+    ax3.set_title('效率对比 (R^2 vs 复杂度)')
     ax3.grid(True, alpha=0.3)
     
     # 4. 方法对比柱状图
@@ -285,7 +285,7 @@ def create_comprehensive_plots(all_performance, output_dir):
     
     bars = ax4.bar(method_types, method_r2_means, yerr=method_r2_stds, 
                    alpha=0.7, color=['blue', 'red', 'green'], capsize=5)
-    ax4.set_ylabel('平均 R² 分数')
+    ax4.set_ylabel('平均 R^2 分数')
     ax4.set_title('不同方法平均性能')
     ax4.grid(True, alpha=0.3)
     
@@ -317,7 +317,7 @@ def create_comprehensive_plots(all_performance, output_dir):
     ax5.set_yticklabels(unique_methods)
     ax5.set_xlabel('维度/模态数')
     ax5.set_ylabel('方法')
-    ax5.set_title('性能热图 (R²)')
+    ax5.set_title('性能热图 (R^2)')
     
     # 添加数值标签
     for i in range(len(unique_methods)):
@@ -331,7 +331,7 @@ def create_comprehensive_plots(all_performance, output_dir):
     # 6. 复杂度vs性能权衡
     ax6 = axes[1, 2]
     
-    # 计算效率指标 (R²/维度)
+    # 计算效率指标 (R^2/维度)
     efficiency = [r2/dim if dim > 0 else 0 for r2, dim in zip(r2_values, dimensions)]
     
     scatter = ax6.scatter(dimensions, r2_values, c=efficiency, s=100, cmap='coolwarm', alpha=0.7)
@@ -341,10 +341,10 @@ def create_comprehensive_plots(all_performance, output_dir):
                     xytext=(5, 5), textcoords='offset points', fontsize=8, alpha=0.8)
     
     ax6.set_xlabel('维度/模态数')
-    ax6.set_ylabel('R² 分数')
+    ax6.set_ylabel('R^2 分数')
     ax6.set_title('复杂度 vs 性能权衡')
     ax6.grid(True, alpha=0.3)
-    plt.colorbar(scatter, ax=ax6, label='效率 (R²/维度)')
+    plt.colorbar(scatter, ax=ax6, label='效率 (R^2/维度)')
     
     plt.tight_layout()
     
@@ -373,8 +373,8 @@ def save_performance_table(all_performance, output_dir):
             '方法': perf['method'],
             '维度': perf['dimensions'],
             'MSE': perf['mse'],
-            'R²': perf['r2'],
-            '效率(R²/维度)': perf['r2'] / perf['dimensions'] if perf['dimensions'] > 0 else 0
+            'R^2': perf['r2'],
+            '效率(R^2/维度)': perf['r2'] / perf['dimensions'] if perf['dimensions'] > 0 else 0
         })
     
     df = pd.DataFrame(df_data)
@@ -564,9 +564,9 @@ def create_enhanced_comparison_with_available_data(ae_results, pod_results, pod_
                         'dimensions': n_modes,
                         'mse': actual_mse,
                         'r2': actual_r2,
-                        'energy_ratio': actual_r2  # 使用R²作为能量比率的代理
+                        'energy_ratio': actual_r2  # 使用R^2作为能量比率的代理
                     }
-                    print(f"  添加POD{n_modes}模态: R²={actual_r2:.4f}, MSE={actual_mse:.6f}")
+                    print(f"  添加POD{n_modes}模态: R^2={actual_r2:.4f}, MSE={actual_mse:.6f}")
             
             # 备选：如果没有实际结果但有lambda值，使用估算
             elif 'lambda_values' in pod_results:
@@ -576,7 +576,7 @@ def create_enhanced_comparison_with_available_data(ae_results, pod_results, pod_
                 for n_modes in [5, 10, 15, 20, 25, 30]:
                     if n_modes <= len(lambda_vals):
                         energy_ratio = np.sum(lambda_vals[:n_modes]) / total_energy
-                        # 估算R²和MSE（基于能量比例）
+                        # 估算R^2和MSE（基于能量比例）
                         estimated_r2 = energy_ratio * pod_r2 if pod_r2 > 0 else energy_ratio
                         estimated_mse = pod_mse * (1 - energy_ratio) if not np.isnan(pod_mse) else float('nan')
                         
@@ -620,7 +620,7 @@ def create_enhanced_comparison_plots(all_performance, output_dir):
     markers = []
     
     for config_name, perf in all_performance.items():
-        # 只要有R²或MSE中的任意一个有效值就包含
+        # 只要有R^2或MSE中的任意一个有效值就包含
         has_valid_r2 = not np.isnan(perf['r2']) and perf['r2'] != 0
         has_valid_mse = not np.isnan(perf['mse'])
         
@@ -663,7 +663,7 @@ def create_enhanced_comparison_plots(all_performance, output_dir):
     r2_array = np.array(r2_values)
     mse_array = np.array(mse_values)
     
-    # 1. 维度 vs R²分数对比
+    # 1. 维度 vs R^2分数对比
     ax1 = axes[0, 0]
     
     # 按方法分组绘制
@@ -680,22 +680,27 @@ def create_enhanced_comparison_plots(all_performance, output_dir):
             method_dims = dims_array[method_mask]
             method_r2 = r2_array[method_mask]
             
-            # 只绘制有效的R²值
+            # 只绘制有效的R^2值
             valid_mask = method_r2 > 0
             if np.any(valid_mask):
+                # 按维度排序确保线条连接正确
+                sort_indices = np.argsort(method_dims[valid_mask])
+                sorted_dims = method_dims[valid_mask][sort_indices]
+                sorted_r2 = method_r2[valid_mask][sort_indices]
+                
                 if method == 'POD':
-                    ax1.plot(method_dims[valid_mask], method_r2[valid_mask], 'bo-', 
+                    ax1.plot(sorted_dims, sorted_r2, 'bo-', 
                             label='POD', linewidth=2, markersize=8)
                 elif method == 'standard':
-                    ax1.plot(method_dims[valid_mask], method_r2[valid_mask], 'rs-', 
+                    ax1.plot(sorted_dims, sorted_r2, 'rs-', 
                             label='Standard AE', linewidth=2, markersize=8)
                 elif method == 'vae':
-                    ax1.plot(method_dims[valid_mask], method_r2[valid_mask], 'g^-', 
+                    ax1.plot(sorted_dims, sorted_r2, 'g^-', 
                             label='VAE', linewidth=2, markersize=8)
     
     ax1.set_xlabel('维度/模态数')
-    ax1.set_ylabel('R² 分数')
-    ax1.set_title('重构质量对比 (R²)')
+    ax1.set_ylabel('R^2 分数')
+    ax1.set_title('重构质量对比 (R^2)')
     ax1.legend()
     ax1.grid(True, alpha=0.3)
     ax1.set_ylim(0, 1.05)
@@ -716,14 +721,19 @@ def create_enhanced_comparison_plots(all_performance, output_dir):
                 method_dims = dims_array[method_mask]
                 method_mse = mse_array[method_mask]
                 
+                # 按维度排序确保线条连接正确
+                sort_indices = np.argsort(method_dims)
+                sorted_dims = method_dims[sort_indices]
+                sorted_mse = method_mse[sort_indices]
+                
                 if method == 'POD':
-                    ax2.plot(method_dims, method_mse, 'bo-', 
+                    ax2.plot(sorted_dims, sorted_mse, 'bo-', 
                             label='POD', linewidth=2, markersize=8)
                 elif method == 'standard':
-                    ax2.plot(method_dims, method_mse, 'rs-', 
+                    ax2.plot(sorted_dims, sorted_mse, 'rs-', 
                             label='Standard AE', linewidth=2, markersize=8)
                 elif method == 'vae':
-                    ax2.plot(method_dims, method_mse, 'g^-', 
+                    ax2.plot(sorted_dims, sorted_mse, 'g^-', 
                             label='VAE', linewidth=2, markersize=8)
         
         ax2.set_yscale('log')
@@ -752,11 +762,11 @@ def create_enhanced_comparison_plots(all_performance, output_dir):
             ax3.annotate(method.replace('_', '\n'), (dim, r2), xytext=(5, 5), 
                         textcoords='offset points', fontsize=8, alpha=0.8)
     else:
-        ax3.text(0.5, 0.5, '无有效R²数据', ha='center', va='center', transform=ax3.transAxes)
+        ax3.text(0.5, 0.5, '无有效R^2数据', ha='center', va='center', transform=ax3.transAxes)
     
     ax3.set_xlabel('维度/模态数')
-    ax3.set_ylabel('R² 分数')
-    ax3.set_title('效率对比 (R² vs 复杂度)')
+    ax3.set_ylabel('R^2 分数')
+    ax3.set_title('效率对比 (R^2 vs 复杂度)')
     ax3.grid(True, alpha=0.3)
     
     # 4. 方法对比柱状图
@@ -782,7 +792,7 @@ def create_enhanced_comparison_plots(all_performance, output_dir):
             else:
                 method_match = (perf['method'] == method_type)
             
-            # 放宽R²条件，只要不是NaN且大于等于0就接受
+            # 放宽R^2条件，只要不是NaN且大于等于0就接受
             r2_valid = not np.isnan(perf['r2']) and perf['r2'] >= 0
             
             if method_match and r2_valid:
@@ -792,13 +802,13 @@ def create_enhanced_comparison_plots(all_performance, output_dir):
         if method_r2s:
             method_r2_means.append(np.mean(method_r2s))
             method_r2_stds.append(np.std(method_r2s))
-            print(f"  {method_type}: 平均R²={np.mean(method_r2s):.3f}, 标准差={np.std(method_r2s):.3f}")
+            print(f"  {method_type}: 平均R^2={np.mean(method_r2s):.3f}, 标准差={np.std(method_r2s):.3f}")
         else:
             method_r2_means.append(0)
             method_r2_stds.append(0)
             print(f"  {method_type}: 没有有效数据")
     
-    # 只绘制有数据的方法（接受R²>=0的方法）
+    # 只绘制有数据的方法（接受R^2>=0的方法）
     valid_methods = [(label, mean, std) for label, mean, std in zip(method_labels, method_r2_means, method_r2_stds) if mean >= 0]
     
     if valid_methods:
@@ -815,7 +825,7 @@ def create_enhanced_comparison_plots(all_performance, output_dir):
     else:
         ax4.text(0.5, 0.5, '无有效方法对比数据', ha='center', va='center', transform=ax4.transAxes)
     
-    ax4.set_ylabel('平均 R² 分数')
+    ax4.set_ylabel('平均 R^2 分数')
     ax4.set_title('不同方法平均性能')
     ax4.grid(True, alpha=0.3)
     
@@ -860,13 +870,13 @@ def create_enhanced_comparison_plots(all_performance, output_dir):
                             ha="center", va="center", 
                             color="white" if matrix[i, j] < 0.5 else "black")
         
-        plt.colorbar(im, ax=ax5, label='R² 分数')
+        plt.colorbar(im, ax=ax5, label='R^2 分数')
     else:
         ax5.text(0.5, 0.5, '无数据可显示', ha='center', va='center', transform=ax5.transAxes)
     
     ax5.set_xlabel('维度/模态数')
     ax5.set_ylabel('方法')
-    ax5.set_title('性能热图 (R²)')
+    ax5.set_title('性能热图 (R^2)')
     
     # 6. 数据完整性统计
     ax6 = axes[1, 2]
@@ -876,7 +886,7 @@ def create_enhanced_comparison_plots(all_performance, output_dir):
         'POD数据': sum(1 for perf in all_performance.values() if perf['method'] == 'POD'),
         'Standard AE': sum(1 for perf in all_performance.values() if perf['method'] == 'standard'),
         'VAE数据': sum(1 for perf in all_performance.values() if perf['method'] == 'vae'),
-        '有效R²': sum(1 for perf in all_performance.values() if perf['r2'] > 0),
+        '有效R^2': sum(1 for perf in all_performance.values() if perf['r2'] > 0),
         '有效MSE': sum(1 for perf in all_performance.values() if not np.isnan(perf['mse']))
     }
     
