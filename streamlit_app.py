@@ -713,6 +713,10 @@ def main():
                     st.session_state.last_log_check += 1
                     st.session_state.logs.append(f"[{st.session_state.last_log_check:04d}] {line}")
                 
+                # 记录最后更新时间
+                import time
+                st.session_state.last_log_update_time = time.time()
+                
                 # 更新日志状态显示
                 with log_status_placeholder.container():
                     st.success(f"📥 获取到 {len(new_logs)} 条新日志 (总共 {len(st.session_state.logs)} 条)")
@@ -732,8 +736,20 @@ def main():
                     else:
                         st.warning("日志文件不存在或路径错误")
                 
-                # 使用更短的延迟，提高响应速度
-                time.sleep(0.2)
+                # 智能延迟：根据最后更新时间调整刷新频率
+                import time
+                current_time = time.time()
+                if hasattr(st.session_state, 'last_log_update_time'):
+                    time_since_last_update = current_time - st.session_state.last_log_update_time
+                    if time_since_last_update < 10:  # 最近10秒有更新，快速检查
+                        time.sleep(0.5)
+                    elif time_since_last_update < 30:  # 10-30秒无更新，中等频率
+                        time.sleep(2.0) 
+                    else:  # 30秒以上无更新，低频率检查
+                        time.sleep(5.0)
+                else:
+                    time.sleep(1.0)  # 默认频率
+                    
                 st.rerun()
             
             # 检查进程是否结束
@@ -918,9 +934,9 @@ def main():
                         highlighted_logs.append(log)
                 log_text = '\n'.join(highlighted_logs)
             
-            # 流式日志显示区域 - 使用动态key确保实时更新
-            import time  # 确保time模块可用
-            log_key = f"log_stream_{len(st.session_state.logs)}_{int(time.time())}"
+            # 流式日志显示区域 - 使用稳定的key避免重复创建
+            # 只有当日志数量变化时才更新key，避免过度刷新
+            log_key = f"log_stream_stable_{len(st.session_state.logs)}"
             st.text_area(
                 "📋 实时日志流", 
                 value=log_text, 
@@ -991,9 +1007,9 @@ def main():
         
     # 如果分析正在运行，自动刷新
     if st.session_state.analysis_running:
-        # 减少刷新频率以提高性能  
+        # 减少刷新频率，避免过度刷新影响显示
         import time
-        time.sleep(0.3)  # 加快刷新速度，提高响应性
+        time.sleep(1.5)  # 适中的刷新频率，确保显示稳定
         st.rerun()
     
     # 结果分析区域
