@@ -21,8 +21,21 @@ def load_parameters(params_file):
     try:
         print(f"正在从 {params_file} 加载参数数据...")
 
-        # 读取CSV文件
-        df = pd.read_csv(params_file)
+        # 读取CSV文件 - 尝试多种编码格式
+        encodings_to_try = ['utf-8', 'gbk', 'gb2312', 'latin1', 'cp1252']
+        df = None
+        
+        for encoding in encodings_to_try:
+            try:
+                df = pd.read_csv(params_file, encoding=encoding)
+                print(f"成功使用 {encoding} 编码读取参数文件")
+                break
+            except UnicodeDecodeError:
+                print(f"使用 {encoding} 编码失败，尝试下一种编码...")
+                continue
+        
+        if df is None:
+            raise ValueError(f"无法使用任何编码格式读取文件 {params_file}")
 
         # 输出CSV文件的基本信息
         print(f"CSV文件形状: {df.shape}")
@@ -239,7 +252,21 @@ def load_rcs_data(rcs_dir, freq_suffix, num_models=100):
 
     # 从第一个可用文件获取角度信息
     print(f"\n读取第一个可用文件以获取角度信息: {first_file}")
-    first_df = pd.read_csv(first_file)
+    
+    # 尝试多种编码格式读取第一个文件
+    encodings_to_try = ['utf-8', 'gbk', 'gb2312', 'latin1', 'cp1252']
+    first_df = None
+    
+    for encoding in encodings_to_try:
+        try:
+            first_df = pd.read_csv(first_file, encoding=encoding)
+            print(f"成功使用 {encoding} 编码读取RCS文件")
+            break
+        except UnicodeDecodeError:
+            continue
+    
+    if first_df is None:
+        raise ValueError(f"无法使用任何编码格式读取文件 {first_file}")
 
     # 如果有NaN值，使用相邻点的均值填充
     if first_df.isna().sum().sum() > 0:
@@ -310,8 +337,19 @@ def load_rcs_data(rcs_dir, freq_suffix, num_models=100):
         file_path = os.path.join(rcs_dir, f"{model_id}_{freq_suffix}.csv")
 
         try:
-            # 读取CSV文件
-            df = pd.read_csv(file_path)
+            # 读取CSV文件 - 尝试多种编码格式
+            df = None
+            for encoding in ['utf-8', 'gbk', 'gb2312', 'latin1', 'cp1252']:
+                try:
+                    df = pd.read_csv(file_path, encoding=encoding)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            
+            if df is None:
+                print(f"  错误: 无法读取模型 {model_id} 的CSV文件，编码格式不支持")
+                rcs_data[idx, :] = 0  # 使用0填充
+                continue
 
             # 如果有NaN值，使用相邻点的均值填充
             if df.isna().sum().sum() > 0:

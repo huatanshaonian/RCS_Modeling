@@ -28,6 +28,7 @@ def plot_training_history(train_losses, val_losses, model_name, output_dir):
     plt.title(f'{model_name} 训练历史')
     plt.legend()
     plt.grid(True, alpha=0.3)
+    plt.yscale('log')  # 使用对数坐标
 
     plt.savefig(os.path.join(output_dir, 'training_history.png'), dpi=200, bbox_inches='tight')
     plt.close()

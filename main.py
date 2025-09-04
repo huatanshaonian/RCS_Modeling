@@ -545,7 +545,11 @@ def analyze_frequency_data(rcs_data, theta_values, phi_values, param_data, param
                 train_stats_original = []
                 train_stats_reconstructed = []
 
-                for i in range(min(5, len(train_indices))):  # 只分析前5个样本
+                # 使用全部训练集样本进行统计分析，但为了计算效率可以设置合理上限
+                n_samples_to_analyze = min(len(train_indices), 20)  # 最多分析20个样本，确保代表性
+                print(f"将分析 {n_samples_to_analyze} 个训练样本的统计特性")
+                
+                for i in range(n_samples_to_analyze):
                     # 重塑为2D角度矩阵
                     original_2d = rcs_data_train[i].reshape(n_theta, n_phi).T
                     reconstructed_2d = reconstructed_train[i].reshape(n_theta, n_phi).T
