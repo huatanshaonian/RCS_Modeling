@@ -634,9 +634,22 @@ def reconstruct_rcs(data, phi_modes, pod_coeffs, mean_data, r_values, theta_valu
                 # 原始RCS
                 original = data_clean[idx].reshape(n_theta, n_phi).T
 
+                # 计算所有重构结果的colorbar范围
+                all_data = [original]
+                for r in r_values:
+                    r_actual = min(r, phi_modes_clean.shape[1], pod_coeffs_clean.shape[1])
+                    reconstructed_temp = (np.dot(pod_coeffs_clean[idx, :r_actual],
+                                                phi_modes_clean[:, :r_actual].T) + mean_data_clean).reshape(n_theta, n_phi).T
+                    all_data.append(reconstructed_temp)
+                
+                # 统一colorbar范围
+                vmin_unified = min(np.min(data) for data in all_data)
+                vmax_unified = max(np.max(data) for data in all_data)
+                
                 plt.subplot(len(r_values) + 1, 3, 1)
-                plt.imshow(original, cmap='jet', extent=[min(theta_values), max(theta_values),min(phi_values), max(phi_values)])
-                plt.colorbar(label='RCS (dB)')
+                im1 = plt.imshow(original, cmap='jet', vmin=vmin_unified, vmax=vmax_unified,
+                               extent=[min(theta_values), max(theta_values),min(phi_values), max(phi_values)])
+                plt.colorbar(im1, label='RCS (dB)')
                 plt.xlabel('俯仰角 $\\theta$ (度)')
                 plt.ylabel('偏航角 $\\phi$ (度)')
                 plt.title(f'原始RCS - 模型 {idx + 1}')
@@ -675,8 +688,9 @@ def reconstruct_rcs(data, phi_modes, pod_coeffs, mean_data, r_values, theta_valu
 
                     # 重构RCS
                     plt.subplot(len(r_values) + 1, 3, (i + 1) * 3 + 1)
-                    plt.imshow(reconstructed, cmap='jet', extent=[min(theta_values), max(theta_values),min(phi_values), max(phi_values)])
-                    plt.colorbar(label='RCS (dB)')
+                    im_recon = plt.imshow(reconstructed, cmap='jet', vmin=vmin_unified, vmax=vmax_unified,
+                                        extent=[min(theta_values), max(theta_values),min(phi_values), max(phi_values)])
+                    plt.colorbar(im_recon, label='RCS (dB)')
                     plt.xlabel('俯仰角 $\\theta$ (度)')
                     plt.ylabel('偏航角 $\\phi$ (度)')
                     plt.title(f'重构RCS (r={r}) - 相对误差: {error * 100:.2f}%')
@@ -831,20 +845,26 @@ def evaluate_test_performance(rcs_data_test, test_reconstruction, theta_values, 
 
         plt.figure(figsize=(15, 5))
 
+        # 统一colorbar范围
+        vmin = min(np.min(original), np.min(reconstructed))
+        vmax = max(np.max(original), np.max(reconstructed))
+        
         # 原始RCS
         plt.subplot(131)
-        plt.imshow(original, cmap='jet', extent=[min(theta_values), max(theta_values),
-                                                 min(phi_values), max(phi_values)])
-        plt.colorbar(label='RCS (dB)')
+        im1 = plt.imshow(original, cmap='jet', vmin=vmin, vmax=vmax,
+                        extent=[min(theta_values), max(theta_values),
+                               min(phi_values), max(phi_values)])
+        plt.colorbar(im1, label='RCS (dB)')
         plt.xlabel('俯仰角 $\\theta$ (度)')
         plt.ylabel('偏航角 $\\phi$ (度)')
         plt.title('原始RCS')
 
         # 重构RCS
         plt.subplot(132)
-        plt.imshow(reconstructed, cmap='jet', extent=[min(theta_values), max(theta_values),
-                                                      min(phi_values), max(phi_values)])
-        plt.colorbar(label='RCS (dB)')
+        im2 = plt.imshow(reconstructed, cmap='jet', vmin=vmin, vmax=vmax,
+                        extent=[min(theta_values), max(theta_values),
+                               min(phi_values), max(phi_values)])
+        plt.colorbar(im2, label='RCS (dB)')
         plt.xlabel('俯仰角 $\\theta$ (度)')
         plt.ylabel('偏航角 $\\phi$ (度)')
         plt.title('重构RCS')

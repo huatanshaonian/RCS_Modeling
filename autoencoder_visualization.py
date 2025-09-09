@@ -119,21 +119,28 @@ def analyze_reconstruction_error(original, reconstructed, theta_values, phi_valu
         plt.figure(figsize=(15, 5))
 
         # 原始数据示例（第一个样本）
-        plt.subplot(131)
         original_2d = original[0].reshape(n_theta, n_phi).T
-        plt.imshow(original_2d, cmap='jet', extent=[min(theta_values), max(theta_values),
-                                                   min(phi_values), max(phi_values)])
-        plt.colorbar(label='RCS (dB)')
+        recon_2d = reconstructed[0].reshape(n_theta, n_phi).T
+        
+        # 统一colorbar范围
+        vmin = min(np.min(original_2d), np.min(recon_2d))
+        vmax = max(np.max(original_2d), np.max(recon_2d))
+        
+        plt.subplot(131)
+        im1 = plt.imshow(original_2d, cmap='jet', vmin=vmin, vmax=vmax,
+                        extent=[min(theta_values), max(theta_values),
+                               min(phi_values), max(phi_values)])
+        plt.colorbar(im1, label='RCS (dB)')
         plt.xlabel('俯仰角 θ (度)')
         plt.ylabel('偏航角 φ (度)')
         plt.title('原始RCS (示例)')
 
         # 重构数据示例（第一个样本）
         plt.subplot(132)
-        recon_2d = reconstructed[0].reshape(n_theta, n_phi).T
-        plt.imshow(recon_2d, cmap='jet', extent=[min(theta_values), max(theta_values),
-                                                min(phi_values), max(phi_values)])
-        plt.colorbar(label='RCS (dB)')
+        im2 = plt.imshow(recon_2d, cmap='jet', vmin=vmin, vmax=vmax,
+                        extent=[min(theta_values), max(theta_values),
+                               min(phi_values), max(phi_values)])
+        plt.colorbar(im2, label='RCS (dB)')
         plt.xlabel('俯仰角 θ (度)')
         plt.ylabel('偏航角 φ (度)')
         plt.title('重构RCS (示例)')
