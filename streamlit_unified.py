@@ -240,10 +240,41 @@ def start_analysis(config):
     """启动分析进程"""
     try:
         if st.session_state.selected_method == "FiLM-UNet训练":
-            # FiLM-UNet训练命令
+            # FiLM-UNet训练命令 - 使用实际存在的训练脚本
             python_executable = sys.executable
-            cmd = [python_executable, 'unet_model/film_unet_trainer.py']  # 假设有这个训练脚本
-            # 添加UNet相关参数...
+            cmd = [python_executable, 'unet_model/main.py']
+            
+            # 添加数据参数
+            data_dir = '/'.join(config['params_path'].split('/')[:-1])  # 从参数路径提取目录
+            params_file = config['params_path'].split('/')[-1]  # 参数文件名
+            
+            cmd.extend(['--data_dir', data_dir])
+            cmd.extend(['--params_file', params_file])
+            cmd.extend(['--rcs_dir', os.path.basename(config['rcs_dir'])])
+            cmd.extend(['--num_models', str(config['num_models'])])
+            
+            # 处理频率参数
+            if config['frequency']:
+                cmd.extend(['--frequency', config['frequency'][0]])
+            
+            # 训练参数
+            cmd.extend(['--batch_size', str(config.get('batch_size', 16))])
+            cmd.extend(['--epochs', str(config.get('epochs', 300))])
+            cmd.extend(['--learning_rate', str(config.get('learning_rate', 0.001))])
+            
+            # 训练集大小 (使用第一个值作为测试集比例的倒数)
+            if config['num_train']:
+                test_ratio = 1.0 - (config['num_train'][0] / config['num_models'])
+                cmd.extend(['--test_size', str(max(0.1, min(0.3, test_ratio)))])
+            
+            # 损失函数权重
+            cmd.extend(['--lambda_mse', str(config.get('lambda_mse', 1.0))])
+            cmd.extend(['--lambda_smooth', str(config.get('lambda_smooth', 0.01))])
+            cmd.extend(['--lambda_physics', str(config.get('lambda_physics', 0.05))])
+            cmd.extend(['--lambda_multiscale', str(config.get('lambda_multiscale', 0.1))])
+            
+            # 输出目录
+            cmd.extend(['--output_dir', config['output_dir']])
         else:
             # POD/AE分析命令
             cmd = run_analysis_command(config)
