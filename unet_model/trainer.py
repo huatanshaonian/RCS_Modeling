@@ -17,9 +17,9 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import json
 
-from .film_unet_model import FiLMUNetModel
-from .custom_losses import CompositeLoss
-from .data_preprocessing import RCSDataLoader
+from film_unet_model import FiLMUNetModel
+from custom_losses import CompositeLoss
+from data_preprocessing import RCSDataLoader
 
 
 class EarlyStopping:

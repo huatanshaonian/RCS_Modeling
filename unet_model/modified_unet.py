@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 try:
-    from .film_layer import ConvFiLMBlock, UpsampleConcatenate, CenterCrop2D
+    from film_layer import ConvFiLMBlock, UpsampleConcatenate, CenterCrop2D
 except ImportError:
     from film_layer import ConvFiLMBlock, UpsampleConcatenate, CenterCrop2D
 

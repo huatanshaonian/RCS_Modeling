@@ -9,15 +9,18 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
-import seaborn as sns
+try:
+    import seaborn as sns
+except ImportError:
+    sns = None
 import pandas as pd
 import os
 from pathlib import Path
 import time
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 
-from .film_unet_model import FiLMUNetModel
-from .data_preprocessing import RCSDataLoader, DataNormalizer
+from film_unet_model import FiLMUNetModel
+from data_preprocessing import RCSDataLoader, DataNormalizer
 
 
 class RCSPredictor:

@@ -11,14 +11,14 @@ __description__ = "FiLM-UNet for RCS Prediction"
 
 # 主要组件导入
 try:
-    from .film_unet_model import FiLMUNetModel
-    from .mlp_encoder import MLPEncoder, DualPathProcessor
-    from .modified_unet import ModifiedUNet
-    from .film_layer import FiLMLayer, ConvFiLMBlock
-    from .custom_losses import CompositeLoss, TVLoss, PhysicsConstraintLoss, MultiscaleLoss
-    from .data_preprocessing import RCSDataLoader, DataNormalizer, DataAugmenter, RCSDataset
-    from .trainer import FiLMUNetTrainer, EarlyStopping, MetricsTracker
-    from .inference import RCSPredictor, RCSVisualizer, ModelEvaluator
+    from film_unet_model import FiLMUNetModel
+    from mlp_encoder import MLPEncoder, DualPathProcessor
+    from modified_unet import ModifiedUNet
+    from film_layer import FiLMLayer, ConvFiLMBlock
+    from custom_losses import CompositeLoss, TVLoss, PhysicsConstraintLoss, MultiscaleLoss
+    from data_preprocessing import RCSDataLoader, DataNormalizer, DataAugmenter, RCSDataset
+    from trainer import FiLMUNetTrainer, EarlyStopping, MetricsTracker
+    from inference import RCSPredictor, RCSVisualizer, ModelEvaluator
 except ImportError:
     # 如果相对导入失败，尝试绝对导入
     from film_unet_model import FiLMUNetModel

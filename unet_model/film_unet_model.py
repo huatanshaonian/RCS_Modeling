@@ -9,8 +9,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 try:
-    from .mlp_encoder import MLPEncoder, DualPathProcessor
-    from .modified_unet import ModifiedUNet
+    from mlp_encoder import MLPEncoder, DualPathProcessor
+    from modified_unet import ModifiedUNet
 except ImportError:
     from mlp_encoder import MLPEncoder, DualPathProcessor
     from modified_unet import ModifiedUNet
