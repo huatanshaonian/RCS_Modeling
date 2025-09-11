@@ -647,20 +647,31 @@ def main():
             update_logs_from_queue()
         
         # 日志控制
-        log_col1, log_col2 = st.columns(2)
+        log_col1, log_col2, log_col3 = st.columns(3)
+        
         with log_col1:
+            show_all_logs = st.checkbox("显示全部日志", value=False)
+        
+        with log_col2:
             if st.button("🔄 刷新"):
                 st.rerun()
-        with log_col2:
+        
+        with log_col3:
             if st.button("🗑️ 清空", disabled=st.session_state.analysis_running):
                 st.session_state.logs = []
                 st.rerun()
         
         # 日志内容
         if st.session_state.logs:
-            log_text = '\n'.join(st.session_state.logs[-50:])  # 显示最后50行
+            if show_all_logs:
+                log_text = '\n'.join(st.session_state.logs)  # 显示全部日志
+            else:
+                log_text = '\n'.join(st.session_state.logs[-50:])  # 显示最后50行
         else:
-            log_text = "等待日志输出..." if not st.session_state.analysis_running else "准备开始..."
+            if st.session_state.analysis_running:
+                log_text = "等待程序输出..."
+            else:
+                log_text = "准备开始..."
         
         st.markdown(
             f'<div class="log-container">{html.escape(log_text)}</div>',

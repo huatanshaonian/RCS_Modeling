@@ -269,7 +269,7 @@ class RCSDataLoader:
         
         for i in range(num_models):
             model_id = i + 1
-            rcs_file = f"{model_id}_{frequency}.csv"
+            rcs_file = f"{model_id:03d}_{frequency}.csv"  # 补0到三位数
             rcs_path = os.path.join(rcs_data_dir, rcs_file)
             
             if not os.path.exists(rcs_path):
