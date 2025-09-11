@@ -4,7 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is a radar cross-section (RCS) analysis project that implements Proper Orthogonal Decomposition (POD) and deep learning autoencoder methods for dimensionality reduction of RCS data. The project analyzes 100 aircraft models at 1.5GHz and 3GHz frequencies, with each model having RCS data at 8281 angle combinations (91×91 elevation/azimuth angles).
+This is a radar cross-section (RCS) analysis project that implements multiple approaches for RCS prediction and analysis:
+
+1. **Traditional POD + Autoencoder**: Proper Orthogonal Decomposition combined with deep learning autoencoder methods for dimensionality reduction
+2. **FiLM-UNet Deep Learning**: End-to-end deep learning model using MLP+FiLM+U-Net architecture for direct RCS prediction from design parameters
+
+The project analyzes 100 aircraft models at 1.5GHz and 3GHz frequencies, with each model having RCS data at 8281 angle combinations (91×91 elevation/azimuth angles).
 
 ## Commands
 
@@ -12,7 +17,10 @@ This is a radar cross-section (RCS) analysis project that implements Proper Orth
 - **Main analysis**: `python run.py` (command-line interface with arguments)
 - **Direct execution**: `python main.py` (uses default parameters)
 - **Traditional GUI**: `python run_gui_fixed.bat` or `python run_gui_fixed.ps1` (fixed encoding and environment issues)
-- **Modern Web Interface**: `run_streamlit.bat` (real-time log streaming and process monitoring)
+- **Modern Web Interface**: `run_streamlit.bat` (POD+AE analysis with real-time monitoring)
+- **Extended Web Interface**: `run_extended_streamlit.bat` (Unified platform for POD+FiLM-UNet)
+- **FiLM-UNet GUI**: `run_unet_gui.bat` (Dedicated GUI for deep learning model)
+- **FiLM-UNet Training**: `python unet_model/main.py --mode train` (Deep learning model training)
 - **Test CUDA availability**: `python check_cuda.py`
 
 ### Command Line Arguments (run.py)
@@ -61,11 +69,26 @@ Install required packages: `pip install -r requirements.txt`
 - `autoencoder_visualization.py`: Plotting and comparison functions
 - `autoencoder_prediction.py`: Prediction pipeline from parameters to RCS
 
+**FiLM-UNet Deep Learning Module** (unet_model/):
+- `film_unet_model.py`: Complete FiLM-UNet model combining MLP+FiLM+U-Net
+- `mlp_encoder.py`: MLP encoder (9D → 1024D) and dual-path processor
+- `modified_unet.py`: Modified U-Net with FiLM modulation for RCS prediction
+- `film_layer.py`: FiLM (Feature-wise Linear Modulation) layers
+- `custom_losses.py`: Multi-scale losses with physics constraints
+- `data_preprocessing.py`: Data loading, normalization, and augmentation
+- `trainer.py`: Training loops with early stopping and validation
+- `inference.py`: Inference engine with visualization capabilities
+- `main.py`: Command-line interface for training and evaluation
+
 **User Interface System**:
-- `rcs_gui.py`: Traditional tkinter GUI with full parameter configuration
-- `streamlit_app.py`: Modern web interface with real-time log streaming and accurate process monitoring
-- `run_gui_fixed.bat/.ps1`: Fixed environment variables for GUI startup
-- `run_streamlit.bat`: Streamlit web application launcher
+- `rcs_gui.py`: Traditional tkinter GUI with full parameter configuration (POD+AE)
+- `unet_model/unet_gui.py`: Dedicated tkinter GUI for FiLM-UNet training
+- `streamlit_app.py`: Original web interface for POD+AE analysis
+- `streamlit_app_extended.py`: Unified web platform for both POD and FiLM-UNet
+- `run_gui_fixed.bat/.ps1`: Fixed environment variables for POD GUI startup
+- `run_streamlit.bat`: Original Streamlit web application launcher
+- `run_extended_streamlit.bat`: Extended Streamlit application launcher
+- `run_unet_gui.bat`: FiLM-UNet GUI launcher
 
 ### Data Structure
 
