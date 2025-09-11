@@ -24,7 +24,7 @@ try:
     )
     from .autoencoder_visualization import (
         plot_training_history, visualize_latent_space, analyze_reconstruction_error,
-        generate_comparison_analysis, compare_with_pod_results
+        generate_comparison_analysis, compare_with_pod_results, generate_reconstruction_examples
     )
 except ImportError:
     # 如果相对导入失败，尝试绝对导入
@@ -36,7 +36,7 @@ except ImportError:
     )
     from autoencoder_visualization import (
         plot_training_history, visualize_latent_space, analyze_reconstruction_error,
-        generate_comparison_analysis, compare_with_pod_results
+        generate_comparison_analysis, compare_with_pod_results, generate_reconstruction_examples
     )
     from autoencoder_prediction import (
         create_autoencoder_prediction_pipeline, save_prediction_summary
@@ -377,10 +377,31 @@ def perform_autoencoder_analysis(rcs_data, theta_values, phi_values, param_data,
                     visualize_latent_space(test_results['latent'], param_test, param_names,
                                            f"{config_name}_测试集", config_dir)
 
-                # 重构误差分析
+                # 重构误差分析 - 训练集
                 analyze_reconstruction_error(rcs_train, train_results['reconstruction'], 
                                              theta_values, phi_values,
                                              f"{config_name}_训练集", config_dir)
+                
+                # 重构误差分析 - 测试集（如果存在）
+                if rcs_test is not None:
+                    analyze_reconstruction_error(rcs_test, test_results['reconstruction'], 
+                                                theta_values, phi_values,
+                                                f"{config_name}_测试集", config_dir)
+                
+                # 生成重建示例可视化
+                print(f"    生成重建示例可视化...")
+                if rcs_test is not None:
+                    # 有测试集时生成训练集和测试集示例
+                    generate_reconstruction_examples(rcs_train, train_results['reconstruction'],
+                                                   rcs_test, test_results['reconstruction'],
+                                                   theta_values, phi_values,
+                                                   f"{config_name}", config_dir)
+                else:
+                    # 只有训练集时生成训练集示例，测试集参数设为空
+                    generate_reconstruction_examples(rcs_train, train_results['reconstruction'],
+                                                   np.array([]), np.array([]),
+                                                   theta_values, phi_values,
+                                                   f"{config_name}", config_dir)
 
                 print(f"  配置 {config_name} 训练完成")
 

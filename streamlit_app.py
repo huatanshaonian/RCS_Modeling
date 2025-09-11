@@ -370,10 +370,21 @@ def main():
     config['ae_enabled'] = st.sidebar.checkbox("启用Autoencoder分析", value=config.get('ae_enabled', True))
     config['skip_ae_training'] = st.sidebar.checkbox("跳过AE重训练", value=config.get('skip_ae_training', False))
     
-    # 保存配置按钮
-    if st.sidebar.button("💾 保存配置"):
+    # 保存所有配置按钮
+    if st.sidebar.button("💾 保存所有配置"):
+        # 确保保存所有详细参数
         save_config(config)
-        st.sidebar.success("配置已保存!")
+        st.sidebar.success("所有配置已保存!")
+        
+        # 显示保存的参数详情
+        saved_params = []
+        saved_params.append(f"基础参数: 路径、频率、模型数量等")
+        if config['pod_enabled']:
+            saved_params.append(f"POD参数: 模态{len(config['pod_modes'])}种, 阈值{config['energy_threshold']}%")
+        if config['ae_enabled']:
+            saved_params.append(f"AE参数: 维度{len(config['latent_dims'])}种, 轮数{config['ae_epochs']}")
+        
+        st.sidebar.info("已保存:\n" + "\n".join([f"• {p}" for p in saved_params]))
     
     # 算法参数配置区域
     st.markdown("---")
@@ -500,58 +511,13 @@ def main():
                 st.markdown("#### 🔬 Autoencoder参数")
                 st.info("Autoencoder分析已禁用")
     
-        # 配置概览和验证
-        st.markdown("---")
-        st.markdown("### 📋 配置概览")
-        
-        # 创建配置概览
-        overview_col1, overview_col2 = st.columns(2)
-    
-        with overview_col1:
-            st.markdown("**基础配置**")
-            st.write(f"📁 参数文件: `{os.path.basename(config['params_path'])}`")
-            st.write(f"📂 RCS数据目录: `{os.path.basename(config['rcs_dir'])}`")
-            st.write(f"📤 输出目录: `{config['output_dir']}`")
-            st.write(f"🔧 频率: {', '.join(config['frequency'])}")
-            st.write(f"🔢 模型数量: {config['num_models']}")
-            st.write(f"🎯 训练集大小: {config['num_train']}")
-            
-        with overview_col2:
-            st.markdown("**算法配置**")
-            
-            if config['pod_enabled']:
-                st.write(f"📐 POD分析: ✅ 启用")
-                st.write(f"  - 多模态对比: {config['pod_modes']}")
-                st.write(f"  - 能量阈值: {config['energy_threshold']}%")
-                st.write(f"  - 可视化模态数: {config['num_modes_visualize']}")
-            else:
-                st.write(f"📐 POD分析: ❌ 禁用")
-                
-            if config['ae_enabled']:
-                st.write(f"🔬 Autoencoder分析: ✅ 启用")
-                st.write(f"  - 隐空间维度: {config['latent_dims']}")
-                st.write(f"  - 模型类型: {config['model_types']}")
-                st.write(f"  - 训练轮数: {config['ae_epochs']}")
-                st.write(f"  - 学习率: {config['ae_learning_rate']}")
-                st.write(f"  - 计算设备: {config['ae_device']}")
-                if config['skip_ae_training']:
-                    st.write(f"  - 跳过重训练: ✅")
-            else:
-                st.write(f"🔬 Autoencoder分析: ❌ 禁用")
-    
-        # 生成的命令预览
-        if st.expander("🔍 查看生成的命令", expanded=False):
-            cmd = run_analysis_command(config)
-            cmd_str = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in cmd)
-            st.code(cmd_str, language='bash')
-    
         # 主要控制区域
         st.markdown("---")
-    
-        # 控制按钮
-        col1, col2 = st.columns(2)
         
-        with col1:
+        # 控制按钮区域 - 三列布局：开始分析、停止分析、保存配置
+        control_col1, control_col2, control_col3 = st.columns(3)
+        
+        with control_col1:
             if not st.session_state.analysis_running:
                 if st.button("▶️ 开始分析", type="primary", use_container_width=True):
                     success, message = start_analysis(config)
@@ -563,7 +529,7 @@ def main():
             else:
                 st.button("⏳ 分析进行中...", disabled=True, use_container_width=True)
         
-        with col2:
+        with control_col2:
             if st.session_state.analysis_running:
                 if st.button("⏹️ 停止分析", type="secondary", use_container_width=True):
                     success, message = stop_analysis()
@@ -574,6 +540,75 @@ def main():
                     st.rerun()
             else:
                 st.button("⏹️ 停止分析", disabled=True, use_container_width=True)
+        
+        with control_col3:
+            # 右侧区域的独立保存按钮
+            if st.button("💾 保存详细配置", use_container_width=True, help="保存右侧详细配置区域的所有POD和AE参数"):
+                # 保存包含右侧详细配置的完整config
+                save_config(config)
+                
+                # 显示详细保存信息
+                saved_details = []
+                saved_details.append(f"基础配置: {len(['params_path', 'rcs_dir', 'output_dir', 'frequency', 'num_models', 'num_train'])}项")
+                
+                if config['pod_enabled']:
+                    pod_params = ['pod_modes', 'energy_threshold', 'num_modes_visualize', 'pod_reconstruct_num']
+                    saved_details.append(f"POD详细参数: {len(pod_params)}项")
+                
+                if config['ae_enabled']:
+                    ae_params = ['latent_dims', 'model_types', 'ae_epochs', 'ae_learning_rate', 'ae_batch_size', 'ae_device']
+                    saved_details.append(f"AE详细参数: {len(ae_params)}项")
+                
+                st.success("✅ 详细配置已保存!")
+                st.info("已保存参数:\n" + "\n".join([f"• {detail}" for detail in saved_details]))
+
+        # 配置概览和验证
+        st.markdown("---")
+        st.markdown("### 📋 配置概览")
+        
+        # 三列布局：基础配置、POD配置、AE配置
+        overview_col1, overview_col2, overview_col3 = st.columns(3)
+        
+        with overview_col1:
+            st.markdown("**📁 基础配置**")
+            st.write(f"📁 **参数文件**: `{os.path.basename(config['params_path'])}`")
+            st.write(f"📂 **RCS数据目录**: `{os.path.basename(config['rcs_dir'])}`")
+            st.write(f"📤 **输出目录**: `{config['output_dir']}`")
+            st.write(f"🔧 **频率**: {', '.join(config['frequency'])}")
+            st.write(f"🔢 **模型数量**: {config['num_models']}")
+            st.write(f"🎯 **训练集大小**: {config['num_train']}")
+        
+        with overview_col2:
+            st.markdown("**📐 POD分析配置**")
+            if config['pod_enabled']:
+                st.write(f"✅ **状态**: 启用")
+                st.write(f"🔢 **多模态对比**: {config['pod_modes']}")
+                st.write(f"⚡ **能量阈值**: {config['energy_threshold']}%")
+                st.write(f"👁️ **可视化模态数**: {config['num_modes_visualize']}")
+                st.write(f"🔧 **重建模态数**: {config['pod_reconstruct_num']}")
+            else:
+                st.write(f"❌ **状态**: 禁用")
+                
+        with overview_col3:
+            st.markdown("**🔬 Autoencoder分析配置**")
+            if config['ae_enabled']:
+                st.write(f"✅ **状态**: 启用")
+                st.write(f"🧠 **隐空间维度**: {config['latent_dims']}")
+                st.write(f"🏗️ **模型类型**: {config['model_types']}")
+                st.write(f"🔄 **训练轮数**: {config['ae_epochs']}")
+                st.write(f"📈 **学习率**: {config['ae_learning_rate']}")
+                st.write(f"💻 **计算设备**: {config['ae_device']}")
+                st.write(f"⚡ **批次大小**: {config['ae_batch_size']}")
+                if config['skip_ae_training']:
+                    st.write(f"⏭️ **跳过重训练**: ✅")
+            else:
+                st.write(f"❌ **状态**: 禁用")
+    
+        # 生成的命令预览
+        if st.expander("🔍 查看生成的命令", expanded=False):
+            cmd = run_analysis_command(config)
+            cmd_str = ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in cmd)
+            st.code(cmd_str, language='bash')
     
     # 右侧：实时日志和状态监控
     with main_col2:

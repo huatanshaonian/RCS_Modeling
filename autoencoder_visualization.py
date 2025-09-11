@@ -184,6 +184,168 @@ def analyze_reconstruction_error(original, reconstructed, theta_values, phi_valu
     plt.close()
 
 
+def generate_reconstruction_examples(train_original, train_reconstructed, test_original, test_reconstructed, 
+                                   theta_values, phi_values, title, output_dir, num_examples=3):
+    """
+    生成训练集和测试集的重建示例可视化
+    
+    参数:
+    train_original: 训练集原始数据
+    train_reconstructed: 训练集重构数据
+    test_original: 测试集原始数据  
+    test_reconstructed: 测试集重构数据
+    theta_values: theta角度值
+    phi_values: phi角度值
+    title: 图表标题
+    output_dir: 输出目录
+    num_examples: 每个数据集显示的示例数量
+    """
+    n_theta = len(theta_values)
+    n_phi = len(phi_values)
+    
+    # 选择代表性示例
+    train_indices = []
+    test_indices = []
+    
+    # 训练集示例选择
+    if len(train_original) > 0:
+        for idx in [0, len(train_original) // 4, len(train_original) // 2, 
+                   3 * len(train_original) // 4, len(train_original) - 1]:
+            if idx < len(train_original):
+                train_indices.append(idx)
+        train_indices = train_indices[:num_examples]
+    
+    # 测试集示例选择
+    if len(test_original) > 0:
+        for idx in [0, len(test_original) // 4, len(test_original) // 2,
+                   3 * len(test_original) // 4, len(test_original) - 1]:
+            if idx < len(test_original):
+                test_indices.append(idx)
+        test_indices = test_indices[:num_examples]
+    
+    # 为每个训练集示例生成可视化
+    for i, idx in enumerate(train_indices):
+        plt.figure(figsize=(18, 6))
+        
+        # 原始数据
+        original_2d = train_original[idx].reshape(n_theta, n_phi).T
+        recon_2d = train_reconstructed[idx].reshape(n_theta, n_phi).T
+        error_2d = ((train_original[idx] - train_reconstructed[idx]) ** 2).reshape(n_theta, n_phi).T
+        
+        # 统一colorbar范围
+        vmin = min(np.min(original_2d), np.min(recon_2d))
+        vmax = max(np.max(original_2d), np.max(recon_2d))
+        
+        # 原始RCS
+        plt.subplot(1, 4, 1)
+        im1 = plt.imshow(original_2d, cmap='jet', vmin=vmin, vmax=vmax,
+                        extent=[min(theta_values), max(theta_values),
+                               min(phi_values), max(phi_values)])
+        plt.colorbar(im1, label='RCS (dB)')
+        plt.xlabel('俯仰角 θ (度)')
+        plt.ylabel('偏航角 φ (度)')
+        plt.title(f'原始RCS - 训练集样本{idx+1}')
+        
+        # 重构RCS
+        plt.subplot(1, 4, 2)
+        im2 = plt.imshow(recon_2d, cmap='jet', vmin=vmin, vmax=vmax,
+                        extent=[min(theta_values), max(theta_values),
+                               min(phi_values), max(phi_values)])
+        plt.colorbar(im2, label='RCS (dB)')
+        plt.xlabel('俯仰角 θ (度)')
+        plt.ylabel('偏航角 φ (度)')
+        plt.title(f'重构RCS - 训练集样本{idx+1}')
+        
+        # 重构误差
+        plt.subplot(1, 4, 3)
+        im3 = plt.imshow(error_2d, cmap='hot',
+                        extent=[min(theta_values), max(theta_values),
+                               min(phi_values), max(phi_values)])
+        plt.colorbar(im3, label='平方误差')
+        plt.xlabel('俯仰角 θ (度)')
+        plt.ylabel('偏航角 φ (度)')
+        plt.title(f'重构误差 - 训练集样本{idx+1}')
+        
+        # 3D表面图
+        ax = plt.subplot(1, 4, 4, projection='3d')
+        theta_grid, phi_grid = np.meshgrid(theta_values, phi_values)
+        surf = ax.plot_surface(theta_grid, phi_grid, original_2d, cmap='jet', 
+                              linewidth=0, antialiased=True, alpha=0.8)
+        plt.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='RCS (dB)')
+        ax.set_xlabel('俯仰角 θ (度)')
+        ax.set_ylabel('偏航角 φ (度)')
+        ax.set_zlabel('RCS (dB)')
+        ax.set_title(f'原始RCS 3D - 训练集样本{idx+1}')
+        
+        plt.suptitle(f'{title} - 训练集重建示例 {i+1}')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, f'train_reconstruction_example_{i+1}.png'), 
+                   dpi=200, bbox_inches='tight')
+        plt.close()
+    
+    # 为每个测试集示例生成可视化
+    for i, idx in enumerate(test_indices):
+        plt.figure(figsize=(18, 6))
+        
+        # 原始数据
+        original_2d = test_original[idx].reshape(n_theta, n_phi).T
+        recon_2d = test_reconstructed[idx].reshape(n_theta, n_phi).T
+        error_2d = ((test_original[idx] - test_reconstructed[idx]) ** 2).reshape(n_theta, n_phi).T
+        
+        # 统一colorbar范围
+        vmin = min(np.min(original_2d), np.min(recon_2d))
+        vmax = max(np.max(original_2d), np.max(recon_2d))
+        
+        # 原始RCS
+        plt.subplot(1, 4, 1)
+        im1 = plt.imshow(original_2d, cmap='jet', vmin=vmin, vmax=vmax,
+                        extent=[min(theta_values), max(theta_values),
+                               min(phi_values), max(phi_values)])
+        plt.colorbar(im1, label='RCS (dB)')
+        plt.xlabel('俯仰角 θ (度)')
+        plt.ylabel('偏航角 φ (度)')
+        plt.title(f'原始RCS - 测试集样本{idx+1}')
+        
+        # 重构RCS
+        plt.subplot(1, 4, 2)
+        im2 = plt.imshow(recon_2d, cmap='jet', vmin=vmin, vmax=vmax,
+                        extent=[min(theta_values), max(theta_values),
+                               min(phi_values), max(phi_values)])
+        plt.colorbar(im2, label='RCS (dB)')
+        plt.xlabel('俯仰角 θ (度)')
+        plt.ylabel('偏航角 φ (度)')
+        plt.title(f'重构RCS - 测试集样本{idx+1}')
+        
+        # 重构误差
+        plt.subplot(1, 4, 3)
+        im3 = plt.imshow(error_2d, cmap='hot',
+                        extent=[min(theta_values), max(theta_values),
+                               min(phi_values), max(phi_values)])
+        plt.colorbar(im3, label='平方误差')
+        plt.xlabel('俯仰角 θ (度)')
+        plt.ylabel('偏航角 φ (度)')
+        plt.title(f'重构误差 - 测试集样本{idx+1}')
+        
+        # 3D表面图
+        ax = plt.subplot(1, 4, 4, projection='3d')
+        theta_grid, phi_grid = np.meshgrid(theta_values, phi_values)
+        surf = ax.plot_surface(theta_grid, phi_grid, original_2d, cmap='jet',
+                              linewidth=0, antialiased=True, alpha=0.8)
+        plt.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='RCS (dB)')
+        ax.set_xlabel('俯仰角 θ (度)')
+        ax.set_ylabel('偏航角 φ (度)')
+        ax.set_zlabel('RCS (dB)')
+        ax.set_title(f'原始RCS 3D - 测试集样本{idx+1}')
+        
+        plt.suptitle(f'{title} - 测试集重建示例 {i+1}')
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, f'test_reconstruction_example_{i+1}.png'), 
+                   dpi=200, bbox_inches='tight')
+        plt.close()
+    
+    print(f"生成了 {len(train_indices)} 个训练集示例和 {len(test_indices)} 个测试集示例")
+
+
 def generate_comparison_analysis(results, output_dir):
     """生成不同配置的对比分析"""
     

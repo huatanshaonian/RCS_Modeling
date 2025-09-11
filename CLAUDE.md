@@ -12,7 +12,7 @@ This is a radar cross-section (RCS) analysis project that implements Proper Orth
 - **Main analysis**: `python run.py` (command-line interface with arguments)
 - **Direct execution**: `python main.py` (uses default parameters)
 - **Traditional GUI**: `python run_gui_fixed.bat` or `python run_gui_fixed.ps1` (fixed encoding and environment issues)
-- **Modern Web Interface**: `python run_streamlit.bat` or via Streamlit
+- **Modern Web Interface**: `run_streamlit.bat` (real-time log streaming and process monitoring)
 - **Test CUDA availability**: `python check_cuda.py`
 
 ### Command Line Arguments (run.py)
@@ -63,7 +63,7 @@ Install required packages: `pip install -r requirements.txt`
 
 **User Interface System**:
 - `rcs_gui.py`: Traditional tkinter GUI with full parameter configuration
-- `streamlit_app.py`: Modern web interface with real-time monitoring
+- `streamlit_app.py`: Modern web interface with real-time log streaming and accurate process monitoring
 - `run_gui_fixed.bat/.ps1`: Fixed environment variables for GUI startup
 - `run_streamlit.bat`: Streamlit web application launcher
 
@@ -116,7 +116,7 @@ The codebase implements robust error handling:
 - `create_autoencoder_prediction_pipeline()`: Creates prediction pipeline
 
 **Interface Management**:
-- `streamlit_app.py`: Multi-page web application with real-time monitoring
+- `streamlit_app.py`: Modern web application with real-time log streaming and process monitoring
 - `rcs_gui.py`: Traditional GUI with complete parameter configuration
 
 ## Special Considerations
@@ -142,7 +142,7 @@ The codebase implements robust error handling:
 
 **Encoding errors**: Use the fixed `data_loader.py` which automatically tries multiple encoding formats
 **GUI startup issues**: Use `run_gui_fixed.bat` or `run_gui_fixed.ps1` to set correct environment variables
-**Web interface**: Use `run_streamlit.bat` to launch modern web interface
+**Web interface**: Use `run_streamlit.bat` to launch modern web interface with real-time monitoring
 **CUDA issues**: Run `python check_cuda.py` to check GPU availability
 
 ## Branch Strategy
