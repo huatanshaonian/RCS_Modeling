@@ -280,7 +280,8 @@ class RCSDataLoader:
                 # 尝试不同编码读取RCS文件
                 for encoding in ['utf-8', 'gbk', 'gb2312', 'latin1']:
                     try:
-                        rcs_df = pd.read_csv(rcs_path, encoding=encoding, header=None)
+                        # 正确读取：第一行是列名，需要header=0
+                        rcs_df = pd.read_csv(rcs_path, encoding=encoding, header=0)
                         break
                     except UnicodeDecodeError:
                         continue
@@ -288,7 +289,35 @@ class RCSDataLoader:
                     print(f"警告: 无法读取RCS文件: {rcs_path}")
                     continue
                 
-                rcs_matrix = rcs_df.values
+                # 检查文件格式：应该有8281行数据和至少9列
+                if rcs_df.shape[0] != 8281:
+                    print(f"警告: RCS数据行数不正确: {rcs_df.shape[0]}, 应为8281行, 文件: {rcs_file}")
+                    continue
+                
+                if rcs_df.shape[1] < 9:
+                    print(f"警告: RCS数据列数不足: {rcs_df.shape[1]}, 至少需要9列, 文件: {rcs_file}")
+                    continue
+                
+                # 检查是否包含rcs(total)列（应该是第9列，索引8）
+                if 'rcs(total)' in rcs_df.columns:
+                    rcs_column = 'rcs(total)'
+                elif rcs_df.shape[1] >= 9:
+                    # 如果没有列名，使用第9列（索引8）
+                    rcs_column = rcs_df.columns[8]
+                else:
+                    print(f"警告: 找不到RCS数据列, 文件: {rcs_file}")
+                    print(f"可用列: {list(rcs_df.columns)}")
+                    continue
+                
+                # 提取RCS数据并重塑为91x91
+                rcs_values = rcs_df[rcs_column].values
+                
+                if len(rcs_values) != 8281:
+                    print(f"警告: RCS值数量不正确: {len(rcs_values)}, 应为8281, 文件: {rcs_file}")
+                    continue
+                
+                # 重塑为91x91矩阵（91个theta × 91个phi）
+                rcs_matrix = rcs_values.reshape(91, 91)
                 
                 # 验证尺寸
                 if rcs_matrix.shape != (91, 91):
