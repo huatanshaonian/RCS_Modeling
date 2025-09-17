@@ -165,8 +165,8 @@ def load_rcs_data(data_dir, model_id, freq_suffix):
     df = pd.read_csv(file_path)
 
     # 确定列名
-    theta_col = 'Theta'  # 俯仰角列
-    phi_col = 'Phi'  # 偏航角列
+    theta_col = 'Theta'  # 方位角列
+    phi_col = 'Phi'  # 俯仰角列
     rcs_col = 'RCS(Total)'  # RCS值列
 
     # 检查必需的列是否存在
@@ -225,8 +225,8 @@ def load_rcs_data_from_file(file_path):
     df = pd.read_csv(file_path)
 
     # 确定列名
-    theta_col = 'Theta'  # 俯仰角列
-    phi_col = 'Phi'  # 偏航角列
+    theta_col = 'Theta'  # 方位角列
+    phi_col = 'Phi'  # 俯仰角列
     rcs_col = 'RCS(Total)'  # RCS值列
 
     # 检查必需的列是否存在
@@ -304,8 +304,8 @@ def visualize_rcs(theta_values, phi_values, rcs_db, model_id, freq, ax=None, cma
                            vmin=vmin, vmax=vmax)
 
     # 设置标签和标题
-    ax.set_xlabel('俯仰角 θ (度)')
-    ax.set_ylabel('偏航角 φ (度)')
+    ax.set_xlabel('偏航角 θ (度)')
+    ax.set_ylabel('俯仰角 φ (度)')
     ax.set_zlabel('RCS (分贝)')
     ax.set_title(f'模型 {model_id} - {freq} RCS')
 

@@ -13,6 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 import os
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -56,9 +57,6 @@ class RCSDataset(Dataset):
         # 数据增强
         if self.augment:
             params, rcs = self.augment(params, rcs)
-        
-        # 添加通道维度到RCS数据
-        rcs = rcs.unsqueeze(0)  # [91, 91] → [1, 91, 91]
         
         return params, rcs
 
@@ -104,6 +102,11 @@ class DataNormalizer:
         """归一化设计参数"""
         if not self.fitted:
             raise ValueError("归一化器尚未拟合，请先调用fit()方法")
+        
+        # 确保输入是2D数组
+        if params.ndim == 1:
+            params = params.reshape(1, -1)
+        
         return self.param_scaler.transform(params)
     
     def transform_rcs(self, rcs_data):
@@ -133,10 +136,27 @@ class DataNormalizer:
             normalized_params = self.transform_params(params_np)
             normalized_rcs = self.transform_rcs(rcs_np)
             
+            # 确保参数是1D的
+            if normalized_params.ndim == 2 and normalized_params.shape[0] == 1:
+                normalized_params = normalized_params.flatten()
+            
+            # 确保RCS是2D的 [91, 91]
+            if normalized_rcs.ndim == 3 and normalized_rcs.shape[0] == 1:
+                normalized_rcs = normalized_rcs.squeeze(0)
+            
             return torch.FloatTensor(normalized_params), torch.FloatTensor(normalized_rcs)
         else:
             normalized_params = self.transform_params(params)
             normalized_rcs = self.transform_rcs(rcs)
+            
+            # 确保参数是1D的
+            if normalized_params.ndim == 2 and normalized_params.shape[0] == 1:
+                normalized_params = normalized_params.flatten()
+            
+            # 确保RCS是2D的 [91, 91]
+            if normalized_rcs.ndim == 3 and normalized_rcs.shape[0] == 1:
+                normalized_rcs = normalized_rcs.squeeze(0)
+            
             return normalized_params, normalized_rcs
 
 
@@ -195,7 +215,7 @@ class DataAugmenter:
 
 class RCSDataLoader:
     """
-    RCS数据加载器
+    RCS数据加载器 - 复用现有的data_loader.py函数，避免重复代码
     """
     
     def __init__(self, data_dir="../parameter", 
@@ -208,7 +228,7 @@ class RCSDataLoader:
         
     def load_data(self, num_models=100, frequency="1.5G", verbose=True):
         """
-        加载数据
+        加载数据 - 复用现有的data_loader.py中的函数
         
         Args:
             num_models: 加载的模型数量
@@ -227,160 +247,128 @@ class RCSDataLoader:
             print(f"  模型数量: {num_models}")
             print(f"  频率: {frequency}")
         
-        # 加载设计参数
-        params_path = os.path.join(self.data_dir, self.params_file)
-        if not os.path.exists(params_path):
-            raise FileNotFoundError(f"参数文件不存在: {params_path}")
+        # 导入现有的数据加载函数
+        import sys
+        import os
+        # 添加项目根目录到Python路径
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        if project_root not in sys.path:
+            sys.path.append(project_root)
         
         try:
-            # 尝试不同编码
-            for encoding in ['utf-8', 'gbk', 'gb2312', 'latin1']:
-                try:
-                    params_df = pd.read_csv(params_path, encoding=encoding)
-                    break
-                except UnicodeDecodeError:
-                    continue
-            else:
-                raise ValueError(f"无法读取参数文件: {params_path}")
+            from data_loader import load_parameters, load_rcs_data
+        except ImportError as e:
+            raise ImportError(f"无法导入现有的数据加载函数: {e}")
+        
+        try:
+            # 1. 使用现有函数加载设计参数
+            params_path = os.path.join(self.data_dir, self.params_file)
+            param_data, param_names = load_parameters(params_path)
+            
+            # 只取前num_models个
+            design_params = param_data[:num_models]
             
             if verbose:
-                print(f"成功加载参数文件，编码: {encoding}")
-                print(f"参数文件形状: {params_df.shape}")
-                
+                print(f"成功加载 {len(design_params)} 个模型的设计参数")
+                print(f"设计参数形状: {design_params.shape}")
+            
+            # 2. 使用现有函数加载RCS数据
+            rcs_data_dir = os.path.join(self.data_dir, self.rcs_dir)
+            rcs_data_flat, theta_values, phi_values, available_models = load_rcs_data(
+                rcs_data_dir, frequency, num_models
+            )
+            
+            # 将RCS数据从[N, 8281]重塑为[N, 91, 91]
+            num_loaded = len(available_models)
+            rcs_data = rcs_data_flat.reshape(num_loaded, 91, 91)
+            
+            # 确保设计参数和RCS数据的模型数匹配
+            # available_models包含成功加载的模型索引（1-based）
+            # 转换为0-based索引来匹配design_params
+            if len(available_models) < len(design_params):
+                model_indices = [idx - 1 for idx in available_models]  # 转换为0-based
+                design_params = design_params[model_indices]
+                if verbose:
+                    print(f"根据RCS数据可用性调整参数数量: {len(model_indices)} 个模型")
+            
+            # 转换RCS值为dB单位 (与传统POD/AE方法保持一致)
+            rcs_data = 10 * np.log10(np.maximum(rcs_data, 1e-10))
+            
+            if verbose:
+                print(f"成功加载 {num_loaded} 个模型")
+                print(f"设计参数形状: {design_params.shape}")
+                print(f"RCS数据形状: {rcs_data.shape}")
+                print(f"RCS数据范围(dB): [{rcs_data.min():.4f}, {rcs_data.max():.4f}]")
+                print(f"角度网格: {len(theta_values)}x{len(phi_values)} = {len(theta_values)*len(phi_values)} 个点")
+            
+            # 保存available_models供后续使用
+            self.available_models = available_models
+            
+            return design_params, rcs_data
+            
         except Exception as e:
-            raise ValueError(f"读取参数文件失败: {e}")
-        
-        # 限制模型数量
-        if num_models > len(params_df):
-            print(f"警告: 请求的模型数量({num_models})超过可用数量({len(params_df)})，使用全部数据")
-            num_models = len(params_df)
-        
-        params_df = params_df.head(num_models)
-        
-        # 提取数值列 (假设前9列是设计参数)
-        design_params = params_df.iloc[:, :9].values
-        
-        # 加载RCS数据
-        rcs_data_list = []
-        rcs_data_dir = os.path.join(self.data_dir, self.rcs_dir)
-        
-        if not os.path.exists(rcs_data_dir):
-            raise FileNotFoundError(f"RCS数据目录不存在: {rcs_data_dir}")
-        
-        for i in range(num_models):
-            model_id = i + 1
-            rcs_file = f"{model_id:03d}_{frequency}.csv"  # 补0到三位数
-            rcs_path = os.path.join(rcs_data_dir, rcs_file)
-            
-            if not os.path.exists(rcs_path):
-                print(f"警告: RCS文件不存在: {rcs_path}")
-                continue
-            
-            try:
-                # 尝试不同编码读取RCS文件
-                for encoding in ['utf-8', 'gbk', 'gb2312', 'latin1']:
-                    try:
-                        # 正确读取：第一行是列名，需要header=0
-                        rcs_df = pd.read_csv(rcs_path, encoding=encoding, header=0)
-                        break
-                    except UnicodeDecodeError:
-                        continue
-                else:
-                    print(f"警告: 无法读取RCS文件: {rcs_path}")
-                    continue
-                
-                # 检查文件格式：应该有8281行数据和至少9列
-                if rcs_df.shape[0] != 8281:
-                    print(f"警告: RCS数据行数不正确: {rcs_df.shape[0]}, 应为8281行, 文件: {rcs_file}")
-                    continue
-                
-                if rcs_df.shape[1] < 9:
-                    print(f"警告: RCS数据列数不足: {rcs_df.shape[1]}, 至少需要9列, 文件: {rcs_file}")
-                    continue
-                
-                # 检查是否包含rcs(total)列（应该是第9列，索引8）
-                if 'rcs(total)' in rcs_df.columns:
-                    rcs_column = 'rcs(total)'
-                elif rcs_df.shape[1] >= 9:
-                    # 如果没有列名，使用第9列（索引8）
-                    rcs_column = rcs_df.columns[8]
-                else:
-                    print(f"警告: 找不到RCS数据列, 文件: {rcs_file}")
-                    print(f"可用列: {list(rcs_df.columns)}")
-                    continue
-                
-                # 提取RCS数据并重塑为91x91
-                rcs_values = rcs_df[rcs_column].values
-                
-                if len(rcs_values) != 8281:
-                    print(f"警告: RCS值数量不正确: {len(rcs_values)}, 应为8281, 文件: {rcs_file}")
-                    continue
-                
-                # 重塑为91x91矩阵（91个theta × 91个phi）
-                rcs_matrix = rcs_values.reshape(91, 91)
-                
-                # 验证尺寸
-                if rcs_matrix.shape != (91, 91):
-                    print(f"警告: RCS数据尺寸不正确: {rcs_matrix.shape}, 文件: {rcs_file}")
-                    continue
-                
-                # 检查NaN值
-                if np.isnan(rcs_matrix).any():
-                    print(f"警告: RCS数据包含NaN值: {rcs_file}")
-                    rcs_matrix = np.nan_to_num(rcs_matrix)
-                
-                rcs_data_list.append(rcs_matrix)
-                
-            except Exception as e:
-                print(f"警告: 读取RCS文件失败: {rcs_file}, 错误: {e}")
-                continue
-        
-        if len(rcs_data_list) == 0:
-            raise ValueError("没有成功加载任何RCS数据")
-        
-        # 调整设计参数数量以匹配成功加载的RCS数据
-        actual_count = len(rcs_data_list)
-        design_params = design_params[:actual_count]
-        rcs_data = np.array(rcs_data_list)
-        
-        if verbose:
-            print(f"成功加载 {actual_count} 个样本")
-            print(f"设计参数形状: {design_params.shape}")
-            print(f"RCS数据形状: {rcs_data.shape}")
-            print(f"RCS数据范围: [{rcs_data.min():.4f}, {rcs_data.max():.4f}]")
-        
-        return design_params, rcs_data
+            raise RuntimeError(f"数据加载失败: {e}")
     
     def create_datasets(self, design_params, rcs_data, 
-                       test_size=0.2, random_state=42,
+                       test_size=0.2, train_size=None, random_state=42,
                        apply_normalization=True,
                        apply_augmentation=True,
-                       augment_params=None):
+                       augment_params=None,
+                       output_dir=None, save_indices=True):
         """
         创建训练和测试数据集
         
         Args:
             design_params: 设计参数
             rcs_data: RCS数据
-            test_size: 测试集比例
+            test_size: 测试集比例 (当train_size为None时使用)
+            train_size: 训练集绝对大小 (优先级高于test_size，用于与AE方法统一)
             random_state: 随机种子
             apply_normalization: 是否应用归一化
             apply_augmentation: 是否对训练集应用数据增强
             augment_params: 数据增强参数
+            output_dir: 输出目录 (用于保存模型索引对照表)
+            save_indices: 是否保存训练集/测试集模型索引对照表
             
         Returns:
             train_dataset: 训练数据集
             test_dataset: 测试数据集
             normalizer: 归一化器
         """
-        # 分割数据
-        train_params, test_params, train_rcs, test_rcs = train_test_split(
-            design_params, rcs_data, test_size=test_size, random_state=random_state
-        )
+        # 分割数据 - 支持两种方式
+        if train_size is not None:
+            # 方式1: 使用绝对训练集大小 (与AE方法统一)
+            num_models = len(design_params)
+            if train_size > num_models:
+                print(f"警告: 训练集大小 {train_size} 超过了可用模型数量 {num_models}")
+                train_size = num_models
+                print(f"调整训练集大小为: {train_size}")
+            
+            # 使用与AE相同的索引划分方式
+            np.random.seed(random_state)
+            indices = np.random.permutation(num_models)
+            train_indices = indices[:train_size]
+            test_indices = indices[train_size:]
+            
+            train_params = design_params[train_indices]
+            test_params = design_params[test_indices]
+            train_rcs = rcs_data[train_indices]
+            test_rcs = rcs_data[test_indices]
+            
+            print(f"数据分割 (绝对大小模式):")
+            print(f"  训练集: {len(train_params)} 样本")
+            print(f"  测试集: {len(test_params)} 样本")
+            
+        else:
+            # 方式2: 使用相对比例 (原有方式)
+            train_params, test_params, train_rcs, test_rcs = train_test_split(
+                design_params, rcs_data, test_size=test_size, random_state=random_state
+            )
+            
+            print(f"数据分割 (比例模式):")
+            print(f"  训练集: {len(train_params)} 样本 ({(1-test_size)*100:.1f}%)")
+            print(f"  测试集: {len(test_params)} 样本 ({test_size*100:.1f}%)")
         
-        print(f"数据分割:")
-        print(f"  训练集: {len(train_params)} 样本")
-        print(f"  测试集: {len(test_params)} 样本")
         
         # 创建归一化器
         normalizer = None
@@ -411,8 +399,107 @@ class RCSDataLoader:
             augment=None  # 测试集不应用增强
         )
         
-        return train_dataset, test_dataset, normalizer
+        # 同时返回原始数据（未归一化的dB值）用于评估对比
+        train_data_raw = {
+            'params': train_params,
+            'rcs': train_rcs,  # 原始dB数据
+            'indices': train_indices
+        }
+        
+        test_data_raw = {
+            'params': test_params,
+            'rcs': test_rcs,  # 原始dB数据
+            'indices': test_indices
+        }
+        
+        # 保存训练集和测试集的模型索引对照表 (与AE方法统一)
+        if save_indices and output_dir is not None and hasattr(self, 'available_models'):
+            self._save_model_indices(train_indices, test_indices, output_dir, train_size)
+        
+        return train_dataset, test_dataset, normalizer, train_data_raw, test_data_raw
     
+    def _save_model_indices(self, train_indices, test_indices, output_dir, train_size):
+        """
+        保存训练集和测试集的模型索引对照表 (与AE方法统一)
+        
+        Args:
+            train_indices: 训练集索引
+            test_indices: 测试集索引  
+            output_dir: 输出目录
+            train_size: 训练集大小 (可能为None)
+        """
+        os.makedirs(output_dir, exist_ok=True)
+        
+        available_models = self.available_models
+        
+        # 如果available_models不为None，转换为真实模型编号
+        if available_models is not None:
+            real_train_indices = [available_models[i] for i in train_indices]
+            real_test_indices = [available_models[i] for i in test_indices]
+
+            print(f"\n训练集真实模型编号 (共 {len(real_train_indices)} 个):")
+            print(real_train_indices)
+
+            # 保存真实模型编号到文件
+            train_indices_file = os.path.join(output_dir, "train_models.txt")
+            with open(train_indices_file, 'w') as f:
+                f.write(f"训练集大小: {train_size if train_size is not None else len(train_indices)}\n")
+                f.write("训练集模型编号:\n")
+                for i, model_idx in enumerate(real_train_indices):
+                    f.write(f"{i + 1}. {model_idx}\n")
+
+            test_indices_file = os.path.join(output_dir, "test_models.txt")
+            with open(test_indices_file, 'w') as f:
+                f.write(f"测试集大小: {len(real_test_indices)}\n")
+                f.write("测试集模型编号:\n")
+                for i, model_idx in enumerate(real_test_indices):
+                    f.write(f"{i + 1}. {model_idx}\n")
+
+            print(f"训练集和测试集模型编号已保存到:\n  {train_indices_file}\n  {test_indices_file}")
+        else:
+            # 保存数组索引到文件
+            train_indices_file = os.path.join(output_dir, "train_indices.txt")
+            with open(train_indices_file, 'w') as f:
+                f.write(f"训练集大小: {train_size if train_size is not None else len(train_indices)}\n")
+                f.write("训练集索引:\n")
+                for i, idx in enumerate(train_indices):
+                    f.write(f"{i + 1}. {idx}\n")
+
+            test_indices_file = os.path.join(output_dir, "test_indices.txt")
+            with open(test_indices_file, 'w') as f:
+                f.write(f"测试集大小: {len(test_indices)}\n")
+                f.write("测试集索引:\n")
+                for i, idx in enumerate(test_indices):
+                    f.write(f"{i + 1}. {idx}\n")
+
+            print(f"训练集和测试集索引已保存到:\n  {train_indices_file}\n  {test_indices_file}")
+
+        # 保存CSV格式的对照表
+        if available_models is not None:
+            train_df = pd.DataFrame({
+                'Index': train_indices,
+                'Model_Number': [available_models[i] for i in train_indices]
+            })
+        else:
+            train_df = pd.DataFrame({
+                'Index': train_indices
+            })
+        train_df.to_csv(os.path.join(output_dir, "train_indices.csv"), index=False)
+
+        # 测试集信息
+        if available_models is not None:
+            test_df = pd.DataFrame({
+                'Index': test_indices,
+                'Model_Number': [available_models[i] for i in test_indices]
+            })
+        else:
+            test_df = pd.DataFrame({
+                'Index': test_indices
+            })
+        test_df.to_csv(os.path.join(output_dir, "test_indices.csv"), index=False)
+        
+        print(f"[OK] CSV格式索引对照表已保存到: train_indices.csv, test_indices.csv")
+
     def create_dataloaders(self, train_dataset, test_dataset, 
                           batch_size=16, num_workers=0, shuffle=True):
         """

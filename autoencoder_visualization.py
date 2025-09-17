@@ -131,8 +131,8 @@ def analyze_reconstruction_error(original, reconstructed, theta_values, phi_valu
                         extent=[min(theta_values), max(theta_values),
                                min(phi_values), max(phi_values)])
         plt.colorbar(im1, label='RCS (dB)')
-        plt.xlabel('俯仰角 θ (度)')
-        plt.ylabel('偏航角 φ (度)')
+        plt.xlabel('偏航角 θ (度)')
+        plt.ylabel('俯仰角 φ (度)')
         plt.title('原始RCS (示例)')
 
         # 重构数据示例（第一个样本）
@@ -141,8 +141,8 @@ def analyze_reconstruction_error(original, reconstructed, theta_values, phi_valu
                         extent=[min(theta_values), max(theta_values),
                                min(phi_values), max(phi_values)])
         plt.colorbar(im2, label='RCS (dB)')
-        plt.xlabel('俯仰角 θ (度)')
-        plt.ylabel('偏航角 φ (度)')
+        plt.xlabel('偏航角 θ (度)')
+        plt.ylabel('俯仰角 φ (度)')
         plt.title('重构RCS (示例)')
 
         # 误差分布
@@ -150,8 +150,8 @@ def analyze_reconstruction_error(original, reconstructed, theta_values, phi_valu
         plt.imshow(error_2d, cmap='hot', extent=[min(theta_values), max(theta_values),
                                                 min(phi_values), max(phi_values)])
         plt.colorbar(label='均方误差')
-        plt.xlabel('俯仰角 θ (度)')
-        plt.ylabel('偏航角 φ (度)')
+        plt.xlabel('偏航角 θ (度)')
+        plt.ylabel('俯仰角 φ (度)')
         plt.title('重构误差分布')
 
         plt.suptitle(f'{title} - 重构误差分析')
@@ -242,8 +242,8 @@ def generate_reconstruction_examples(train_original, train_reconstructed, test_o
                         extent=[min(theta_values), max(theta_values),
                                min(phi_values), max(phi_values)])
         plt.colorbar(im1, label='RCS (dB)')
-        plt.xlabel('俯仰角 θ (度)')
-        plt.ylabel('偏航角 φ (度)')
+        plt.xlabel('偏航角 θ (度)')
+        plt.ylabel('俯仰角 φ (度)')
         plt.title(f'原始RCS - 训练集样本{idx+1}')
         
         # 重构RCS
@@ -252,8 +252,8 @@ def generate_reconstruction_examples(train_original, train_reconstructed, test_o
                         extent=[min(theta_values), max(theta_values),
                                min(phi_values), max(phi_values)])
         plt.colorbar(im2, label='RCS (dB)')
-        plt.xlabel('俯仰角 θ (度)')
-        plt.ylabel('偏航角 φ (度)')
+        plt.xlabel('偏航角 θ (度)')
+        plt.ylabel('俯仰角 φ (度)')
         plt.title(f'重构RCS - 训练集样本{idx+1}')
         
         # 重构误差
@@ -262,8 +262,8 @@ def generate_reconstruction_examples(train_original, train_reconstructed, test_o
                         extent=[min(theta_values), max(theta_values),
                                min(phi_values), max(phi_values)])
         plt.colorbar(im3, label='平方误差')
-        plt.xlabel('俯仰角 θ (度)')
-        plt.ylabel('偏航角 φ (度)')
+        plt.xlabel('偏航角 θ (度)')
+        plt.ylabel('俯仰角 φ (度)')
         plt.title(f'重构误差 - 训练集样本{idx+1}')
         
         # 3D表面图
@@ -272,8 +272,8 @@ def generate_reconstruction_examples(train_original, train_reconstructed, test_o
         surf = ax.plot_surface(theta_grid, phi_grid, original_2d, cmap='jet', 
                               linewidth=0, antialiased=True, alpha=0.8)
         plt.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='RCS (dB)')
-        ax.set_xlabel('俯仰角 θ (度)')
-        ax.set_ylabel('偏航角 φ (度)')
+        ax.set_xlabel('偏航角 θ (度)')
+        ax.set_ylabel('俯仰角 φ (度)')
         ax.set_zlabel('RCS (dB)')
         ax.set_title(f'原始RCS 3D - 训练集样本{idx+1}')
         
@@ -302,8 +302,8 @@ def generate_reconstruction_examples(train_original, train_reconstructed, test_o
                         extent=[min(theta_values), max(theta_values),
                                min(phi_values), max(phi_values)])
         plt.colorbar(im1, label='RCS (dB)')
-        plt.xlabel('俯仰角 θ (度)')
-        plt.ylabel('偏航角 φ (度)')
+        plt.xlabel('偏航角 θ (度)')
+        plt.ylabel('俯仰角 φ (度)')
         plt.title(f'原始RCS - 测试集样本{idx+1}')
         
         # 重构RCS
@@ -312,8 +312,8 @@ def generate_reconstruction_examples(train_original, train_reconstructed, test_o
                         extent=[min(theta_values), max(theta_values),
                                min(phi_values), max(phi_values)])
         plt.colorbar(im2, label='RCS (dB)')
-        plt.xlabel('俯仰角 θ (度)')
-        plt.ylabel('偏航角 φ (度)')
+        plt.xlabel('偏航角 θ (度)')
+        plt.ylabel('俯仰角 φ (度)')
         plt.title(f'重构RCS - 测试集样本{idx+1}')
         
         # 重构误差
@@ -322,8 +322,8 @@ def generate_reconstruction_examples(train_original, train_reconstructed, test_o
                         extent=[min(theta_values), max(theta_values),
                                min(phi_values), max(phi_values)])
         plt.colorbar(im3, label='平方误差')
-        plt.xlabel('俯仰角 θ (度)')
-        plt.ylabel('偏航角 φ (度)')
+        plt.xlabel('偏航角 θ (度)')
+        plt.ylabel('俯仰角 φ (度)')
         plt.title(f'重构误差 - 测试集样本{idx+1}')
         
         # 3D表面图
@@ -332,8 +332,8 @@ def generate_reconstruction_examples(train_original, train_reconstructed, test_o
         surf = ax.plot_surface(theta_grid, phi_grid, original_2d, cmap='jet',
                               linewidth=0, antialiased=True, alpha=0.8)
         plt.colorbar(surf, ax=ax, shrink=0.5, aspect=5, label='RCS (dB)')
-        ax.set_xlabel('俯仰角 θ (度)')
-        ax.set_ylabel('偏航角 φ (度)')
+        ax.set_xlabel('偏航角 θ (度)')
+        ax.set_ylabel('俯仰角 φ (度)')
         ax.set_zlabel('RCS (dB)')
         ax.set_title(f'原始RCS 3D - 测试集样本{idx+1}')
         

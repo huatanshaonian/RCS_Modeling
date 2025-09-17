@@ -150,9 +150,9 @@ class RCSPredictor:
 class RCSVisualizer:
     """RCS可视化器"""
     
-    def __init__(self, theta_range=(-90, 90), phi_range=(-90, 90)):
-        self.theta_range = theta_range
-        self.phi_range = phi_range
+    def __init__(self, theta_range=(-45, 45), phi_range=(45, 135)):
+        self.theta_range = theta_range  # 方位角范围（横轴）
+        self.phi_range = phi_range      # 俯仰角范围（纵轴）
         self.theta_values = np.linspace(theta_range[0], theta_range[1], 91)
         self.phi_values = np.linspace(phi_range[0], phi_range[1], 91)
         
@@ -172,11 +172,13 @@ class RCSVisualizer:
         """
         fig, ax = plt.subplots(figsize=figsize)
         
-        # 创建热图
-        im = ax.imshow(rcs_data, 
+        # 创建热图 - 转置数据以确保与AE一致的轴对应关系
+        # extent=[left, right, bottom, top] = [theta_min, theta_max, phi_min, phi_max]
+        # origin='upper'确保俯仰角45度在上面，135度在下面
+        im = ax.imshow(rcs_data.T, 
                       extent=[self.theta_range[0], self.theta_range[1], 
-                             self.phi_range[0], self.phi_range[1]],
-                      origin='lower', 
+                             self.phi_range[1], self.phi_range[0]],  # 交换phi范围顺序
+                      origin='upper', 
                       cmap='jet',
                       aspect='auto')
         
@@ -184,9 +186,9 @@ class RCSVisualizer:
         cbar = plt.colorbar(im, ax=ax)
         cbar.set_label('RCS (dB)', rotation=270, labelpad=15)
         
-        # 设置标签和标题
-        ax.set_xlabel('俯仰角 θ (度)')
-        ax.set_ylabel('偏航角 φ (度)')
+        # 设置标签和标题 (横轴=theta偏航角, 纵轴=phi俯仰角)
+        ax.set_xlabel('偏航角 θ (度)')
+        ax.set_ylabel('俯仰角 φ (度)')
         ax.set_title(title)
         ax.grid(True, alpha=0.3)
         
@@ -214,16 +216,16 @@ class RCSVisualizer:
         # 创建网格
         theta_grid, phi_grid = np.meshgrid(self.theta_values, self.phi_values)
         
-        # 绘制3D表面
-        surf = ax.plot_surface(theta_grid, phi_grid, rcs_data,
+        # 绘制3D表面 - 转置数据以确保与AE一致的轴对应关系
+        surf = ax.plot_surface(theta_grid, phi_grid, rcs_data.T,
                               cmap='jet', linewidth=0, antialiased=True, alpha=0.8)
         
         # 添加颜色条
         fig.colorbar(surf, shrink=0.5, aspect=5, label='RCS (dB)')
         
         # 设置标签和标题
-        ax.set_xlabel('俯仰角 θ (度)')
-        ax.set_ylabel('偏航角 φ (度)')
+        ax.set_xlabel('偏航角 θ (度)')
+        ax.set_ylabel('俯仰角 φ (度)')
         ax.set_zlabel('RCS (dB)')
         ax.set_title(title)
         
@@ -249,35 +251,35 @@ class RCSVisualizer:
         vmin = min(np.min(prediction), np.min(target))
         vmax = max(np.max(prediction), np.max(target))
         
-        # 预测值
-        im1 = axes[0].imshow(prediction, 
+        # 预测值 - 转置数据以确保与AE一致的轴对应关系
+        im1 = axes[0].imshow(prediction.T, 
                            extent=[self.theta_range[0], self.theta_range[1], 
                                   self.phi_range[0], self.phi_range[1]],
                            origin='lower', cmap='jet', vmin=vmin, vmax=vmax)
         axes[0].set_title(f'{title_prefix} - 预测值')
-        axes[0].set_xlabel('俯仰角 θ (度)')
-        axes[0].set_ylabel('偏航角 φ (度)')
+        axes[0].set_xlabel('方位角 θ (度)')
+        axes[0].set_ylabel('俯仰角 φ (度)')
         plt.colorbar(im1, ax=axes[0], label='RCS (dB)')
         
-        # 真实值
-        im2 = axes[1].imshow(target, 
+        # 真实值 - 转置数据以确保与AE一致的轴对应关系
+        im2 = axes[1].imshow(target.T, 
                            extent=[self.theta_range[0], self.theta_range[1], 
                                   self.phi_range[0], self.phi_range[1]],
                            origin='lower', cmap='jet', vmin=vmin, vmax=vmax)
         axes[1].set_title(f'{title_prefix} - 真实值')
-        axes[1].set_xlabel('俯仰角 θ (度)')
-        axes[1].set_ylabel('偏航角 φ (度)')
+        axes[1].set_xlabel('方位角 θ (度)')
+        axes[1].set_ylabel('俯仰角 φ (度)')
         plt.colorbar(im2, ax=axes[1], label='RCS (dB)')
         
-        # 误差图
+        # 误差图 - 转置数据以确保与AE一致的轴对应关系
         error = np.abs(prediction - target)
-        im3 = axes[2].imshow(error, 
+        im3 = axes[2].imshow(error.T, 
                            extent=[self.theta_range[0], self.theta_range[1], 
                                   self.phi_range[0], self.phi_range[1]],
                            origin='lower', cmap='hot')
         axes[2].set_title(f'{title_prefix} - 绝对误差')
-        axes[2].set_xlabel('俯仰角 θ (度)')
-        axes[2].set_ylabel('偏航角 φ (度)')
+        axes[2].set_xlabel('方位角 θ (度)')
+        axes[2].set_ylabel('俯仰角 φ (度)')
         plt.colorbar(im3, ax=axes[2], label='绝对误差')
         
         plt.tight_layout()
@@ -307,14 +309,14 @@ class RCSVisualizer:
         axes[0, 0].tick_params(axis='x', rotation=45)
         axes[0, 0].grid(True, alpha=0.3)
         
-        # RCS热图
-        im = axes[0, 1].imshow(rcs_prediction, 
+        # RCS热图 - 转置数据以确保与AE一致的轴对应关系
+        im = axes[0, 1].imshow(rcs_prediction.T, 
                               extent=[self.theta_range[0], self.theta_range[1], 
                                      self.phi_range[0], self.phi_range[1]],
                               origin='lower', cmap='jet')
         axes[0, 1].set_title('RCS预测')
-        axes[0, 1].set_xlabel('俯仰角 θ (度)')
-        axes[0, 1].set_ylabel('偏航角 φ (度)')
+        axes[0, 1].set_xlabel('方位角 θ (度)')
+        axes[0, 1].set_ylabel('俯仰角 φ (度)')
         plt.colorbar(im, ax=axes[0, 1], label='RCS (dB)')
         
         # RCS统计信息
@@ -388,7 +390,18 @@ class ModelEvaluator:
                 
                 # 收集结果
                 all_predictions.append(predictions)
-                all_targets.append(rcs_targets.numpy()[:, 0])  # 移除通道维度
+                # 确保目标数据形状正确
+                if rcs_targets.dim() == 4:  # [B, 1, 91, 91] -> [B, 91, 91]
+                    target_data = rcs_targets.numpy()[:, 0]
+                else:  # [B, 91, 91] -> 保持不变
+                    target_data = rcs_targets.numpy()
+                
+                # 对目标数据进行反归一化 (与预测数据保持一致)
+                if self.predictor.normalizer:
+                    for i in range(target_data.shape[0]):
+                        target_data[i] = self.predictor.normalizer.inverse_transform_rcs(target_data[i])
+                
+                all_targets.append(target_data)
                 all_params.append(design_params.numpy())
                 
                 if batch_idx % 10 == 0:
@@ -400,6 +413,9 @@ class ModelEvaluator:
         all_params = np.concatenate(all_params, axis=0)
         
         print(f"评估完成，共处理 {len(all_predictions)} 个样本")
+        print(f"预测数据形状: {all_predictions.shape}")
+        print(f"目标数据形状: {all_targets.shape}")
+        print(f"参数数据形状: {all_params.shape}")
         
         # 计算指标
         metrics = self._compute_metrics(all_predictions, all_targets)
@@ -427,9 +443,13 @@ class ModelEvaluator:
     
     def _compute_metrics(self, predictions, targets):
         """计算评估指标"""
+        print(f"指标计算 - 预测形状: {predictions.shape}, 目标形状: {targets.shape}")
+        
         # 展平数据用于计算指标
         pred_flat = predictions.reshape(-1)
         target_flat = targets.reshape(-1)
+        
+        print(f"展平后 - 预测: {pred_flat.shape}, 目标: {target_flat.shape}")
         
         metrics = {
             'mse': mean_squared_error(target_flat, pred_flat),
@@ -479,7 +499,7 @@ class ModelEvaluator:
         
         print(f"评估报告已生成: {output_dir}")
     
-    def _plot_error_distribution(self, predictions, targets, output_dir):
+    def _plot_error_distribution(self, predictions, targets, output_dir, dataset_type='test'):
         """绘制误差分布"""
         errors = predictions - targets
         abs_errors = np.abs(errors)
@@ -488,14 +508,14 @@ class ModelEvaluator:
         
         # 误差直方图
         axes[0, 0].hist(errors.flatten(), bins=100, alpha=0.7, color='blue', edgecolor='black')
-        axes[0, 0].set_title('预测误差分布')
+        axes[0, 0].set_title(f'{dataset_type.upper()}集预测误差分布')
         axes[0, 0].set_xlabel('误差值')
         axes[0, 0].set_ylabel('频次')
         axes[0, 0].grid(True, alpha=0.3)
         
         # 绝对误差直方图
         axes[0, 1].hist(abs_errors.flatten(), bins=100, alpha=0.7, color='red', edgecolor='black')
-        axes[0, 1].set_title('绝对误差分布')
+        axes[0, 1].set_title(f'{dataset_type.upper()}集绝对误差分布')
         axes[0, 1].set_xlabel('绝对误差值')
         axes[0, 1].set_ylabel('频次')
         axes[0, 1].grid(True, alpha=0.3)
@@ -510,7 +530,7 @@ class ModelEvaluator:
         axes[1, 0].scatter(target_sample, pred_sample, alpha=0.5, s=1)
         axes[1, 0].plot([target_sample.min(), target_sample.max()], 
                        [target_sample.min(), target_sample.max()], 'r--', lw=2)
-        axes[1, 0].set_title('预测值 vs 真实值')
+        axes[1, 0].set_title(f'{dataset_type.upper()}集预测值 vs 真实值')
         axes[1, 0].set_xlabel('真实值')
         axes[1, 0].set_ylabel('预测值')
         axes[1, 0].grid(True, alpha=0.3)
@@ -525,13 +545,13 @@ class ModelEvaluator:
         
         plt.tight_layout()
         
-        error_dist_path = os.path.join(output_dir, 'error_distribution.png')
+        error_dist_path = os.path.join(output_dir, f'error_distribution_{dataset_type}.png')
         plt.savefig(error_dist_path, dpi=300, bbox_inches='tight')
         plt.close()
         
         print(f"误差分布图已保存: {error_dist_path}")
     
-    def _plot_parameter_correlation(self, params, predictions, targets, output_dir):
+    def _plot_parameter_correlation(self, params, predictions, targets, output_dir, dataset_type='test'):
         """绘制参数相关性分析"""
         # 计算每个样本的预测误差
         sample_errors = np.mean(np.abs(predictions - targets), axis=(1, 2))
@@ -568,11 +588,187 @@ class ModelEvaluator:
         
         plt.tight_layout()
         
-        correlation_path = os.path.join(output_dir, 'parameter_correlation.png')
+        correlation_path = os.path.join(output_dir, f'parameter_correlation_{dataset_type}.png')
         plt.savefig(correlation_path, dpi=300, bbox_inches='tight')
         plt.close()
         
         print(f"参数相关性图已保存: {correlation_path}")
+    
+    def _compare_rcs_statistics(self, predictions, targets, output_dir, dataset_type='test'):
+        """比较预测和真实RCS的统计数据 (引用现有函数)"""
+        try:
+            # 尝试导入现有的统计比较函数
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from model_analysis import compare_statistics
+            
+            # 定义角度值 (与data_loader.py一致)
+            theta_values = np.linspace(-45, 45, 91)  # 偏航角
+            phi_values = np.linspace(45, 135, 91)    # 俯仰角
+            
+            # 计算原始数据统计
+            def calculate_rcs_statistics(rcs_data, prefix):
+                """计算RCS统计数据"""
+                statistics = []
+                for i in range(len(rcs_data)):
+                    rcs_2d = rcs_data[i]  # 已经是[91, 91]格式
+                    
+                    # 找出最大值和最小值的2D索引
+                    max_idx = np.unravel_index(np.argmax(rcs_2d), rcs_2d.shape)
+                    min_idx = np.unravel_index(np.argmin(rcs_2d), rcs_2d.shape)
+                    
+                    # 获取最大值、最小值及其对应的角度值
+                    max_value_dbsm = rcs_2d[max_idx]
+                    max_theta = theta_values[max_idx[1]]  # 列索引对应theta
+                    max_phi = phi_values[max_idx[0]]     # 行索引对应phi
+                    
+                    min_value_dbsm = rcs_2d[min_idx]
+                    min_theta = theta_values[min_idx[1]]
+                    min_phi = phi_values[min_idx[0]]
+                    
+                    # 计算基本统计量
+                    stats = {
+                        '模型': f'{prefix}{i+1}',
+                        '均值(dBsm)': np.mean(rcs_2d),
+                        '中位数(dBsm)': np.median(rcs_2d),
+                        '极大值(dBsm)': max_value_dbsm,
+                        '极大值θ': max_theta,
+                        '极大值φ': max_phi,
+                        '极小值(dBsm)': min_value_dbsm,
+                        '极小值θ': min_theta,
+                        '极小值φ': min_phi,
+                        '极差': max_value_dbsm - min_value_dbsm,
+                        '标准差': np.std(rcs_2d)
+                    }
+                    statistics.append(stats)
+                
+                return pd.DataFrame(statistics)
+            
+            # 计算预测数据和真实数据的统计
+            pred_stats = calculate_rcs_statistics(predictions, f'{dataset_type.upper()}_Pred_')
+            true_stats = calculate_rcs_statistics(targets, f'{dataset_type.upper()}_True_')
+            
+            # 调用现有的比较函数
+            compare_statistics(true_stats, pred_stats, output_dir)
+            
+            print(f"RCS统计数据比较已保存: {os.path.join(output_dir, 'stats_comparison.csv')}")
+            
+        except ImportError as e:
+            print(f"无法导入统计比较函数: {e}")
+            print("跳过统计数据比较...")
+        except Exception as e:
+            print(f"统计数据比较过程中出错: {e}")
+            print("跳过统计数据比较...")
+    
+    def evaluate_with_raw_targets(self, test_params, test_rcs_raw, output_dir='./evaluation_raw', 
+                                model_indices=None, dataset_type='test'):
+        """
+        使用原始dB数据作为真实值进行评估（避免归一化/反归一化的往返损失）
+        
+        Args:
+            test_params: 测试参数 [N, 9]
+            test_rcs_raw: 原始测试RCS数据 (dB值) [N, 91, 91]  
+            output_dir: 输出目录
+            model_indices: 模型编号列表 (1-based，如[1,2,5])，用于显示原始模型ID
+            dataset_type: 数据集类型 ('test' 或 'train')
+            
+        Returns:
+            evaluation_results: 评估结果字典
+        """
+        os.makedirs(output_dir, exist_ok=True)
+        print(f"使用原始dB数据进行评估...")
+        print(f"测试样本数: {len(test_params)}")
+        print(f"原始RCS数据范围: [{test_rcs_raw.min():.2f}, {test_rcs_raw.max():.2f}] dB")
+        
+        # 批量预测
+        start_time = time.time()
+        predictions, batch_info = self.predictor.predict_batch(test_params)
+        inference_time = time.time() - start_time
+        
+        print(f"预测完成，用时 {inference_time:.2f} 秒")
+        print(f"预测数据范围: [{predictions.min():.2f}, {predictions.max():.2f}] dB")
+        
+        # 计算评估指标 (直接使用原始dB数据，无归一化往返损失)
+        mse = mean_squared_error(test_rcs_raw.reshape(-1), predictions.reshape(-1))
+        mae = mean_absolute_error(test_rcs_raw.reshape(-1), predictions.reshape(-1))
+        r2 = r2_score(test_rcs_raw.reshape(-1), predictions.reshape(-1))
+        
+        # 计算样本级别的误差
+        sample_mse = np.mean((predictions - test_rcs_raw) ** 2, axis=(1, 2))
+        sample_mae = np.mean(np.abs(predictions - test_rcs_raw), axis=(1, 2))
+        
+        results = {
+            'metrics': {
+                'MSE': mse,
+                'MAE': mae,
+                'R2': r2,
+                'RMSE': np.sqrt(mse),
+                'Sample_MSE_mean': np.mean(sample_mse),
+                'Sample_MSE_std': np.std(sample_mse),
+                'Sample_MAE_mean': np.mean(sample_mae),
+                'Sample_MAE_std': np.std(sample_mae)
+            },
+            'performance': {
+                'total_inference_time': inference_time,
+                'samples_per_second': len(test_params) / inference_time,
+                'time_per_sample': inference_time / len(test_params)
+            }
+        }
+        
+        print(f"\n=== 评估结果 (使用原始dB数据) ===")
+        print(f"MSE: {mse:.6f}")
+        print(f"MAE: {mae:.6f} dB")
+        print(f"R²: {r2:.6f}")
+        print(f"RMSE: {np.sqrt(mse):.6f} dB")
+        
+        # 保存评估指标
+        metrics_path = os.path.join(output_dir, 'evaluation_metrics_raw.txt')
+        with open(metrics_path, 'w', encoding='utf-8') as f:
+            f.write("=== 模型评估结果 (原始dB数据) ===\n\n")
+            f.write("预测精度指标:\n")
+            for metric, value in results['metrics'].items():
+                f.write(f"  {metric}: {value:.6f}\n")
+            
+            f.write("\n性能指标:\n")
+            for metric, value in results['performance'].items():
+                f.write(f"  {metric}: {value:.6f}\n")
+        
+        print(f"评估指标已保存: {metrics_path}")
+        
+        # 绘制对比图 (真实值直接使用原始dB数据)
+        sample_indices = np.random.choice(len(predictions), min(5, len(predictions)), replace=False)
+        
+        for i, idx in enumerate(sample_indices):
+            # 确定标题和文件名
+            if model_indices is not None and idx < len(model_indices):
+                model_id = model_indices[idx]
+                title_prefix = f"{dataset_type.upper()} 样本 {idx} (模型 {model_id:03d})"
+                filename = f'comparison_{dataset_type}_sample_{idx}_model_{model_id:03d}.png'
+            else:
+                title_prefix = f"{dataset_type.upper()} 样本 {idx}"
+                filename = f'comparison_{dataset_type}_sample_{idx}.png'
+            
+            comparison_path = os.path.join(output_dir, filename)
+            self.visualizer.plot_comparison(
+                predictions[idx], test_rcs_raw[idx],  # 直接使用原始dB数据
+                title_prefix=title_prefix,
+                save_path=comparison_path
+            )
+            plt.close()
+        
+        # 绘制误差分布
+        self._plot_error_distribution(predictions, test_rcs_raw, output_dir, dataset_type)
+        
+        # 绘制参数相关性分析
+        self._plot_parameter_correlation(test_params, predictions, test_rcs_raw, output_dir, dataset_type)
+        
+        # 添加统计数据比较 (引用现有函数)
+        self._compare_rcs_statistics(predictions, test_rcs_raw, output_dir, dataset_type)
+        
+        print(f"评估报告已生成: {output_dir}")
+        
+        return results
 
 
 def demo_inference():

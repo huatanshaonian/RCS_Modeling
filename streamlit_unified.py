@@ -117,9 +117,9 @@ def load_default_unet_config():
         'params_path': '../parameter/parameters_sorted.csv',
         'rcs_dir': '../parameter/csv_output',
         'output_dir': './unet_outputs',
-        'frequency': ['1.5G'],
-        'num_models': 100,
-        'num_train': [80],
+        'frequency': ['1.5G'],  # UNet与AE统一使用频率列表 (支持多频率: ['1.5G', '3G'])
+        'num_models': 80,     # UNet使用的模型数量
+        'run_name': '',       # 自定义运行名称
         'batch_size': 16,
         'epochs': 300,
         'learning_rate': 0.001,
@@ -253,19 +253,26 @@ def start_analysis(config):
             cmd.extend(['--rcs_dir', os.path.basename(config['rcs_dir'])])
             cmd.extend(['--num_models', str(config['num_models'])])
             
-            # 处理频率参数
-            if config['frequency']:
-                cmd.extend(['--frequency', config['frequency'][0]])
+            # 处理频率参数 (UNet现在支持多频率训练)
+            if config.get('frequency') and len(config['frequency']) > 0:
+                if len(config['frequency']) == 1:
+                    # 单频率训练
+                    frequency = config['frequency'][0]
+                    cmd.extend(['--frequency', frequency])
+                else:
+                    # 多频率训练 - 使用frequencies参数
+                    cmd.extend(['--frequencies'] + config['frequency'])
+            
+            # 测试集比例参数已被训练集绝对大小替代，无需添加
             
             # 训练参数
             cmd.extend(['--batch_size', str(config.get('batch_size', 16))])
             cmd.extend(['--epochs', str(config.get('epochs', 300))])
             cmd.extend(['--learning_rate', str(config.get('learning_rate', 0.001))])
             
-            # 训练集大小 (使用第一个值作为测试集比例的倒数)
+            # 训练集大小 (使用绝对大小，与AE方法统一)
             if config['num_train']:
-                test_ratio = 1.0 - (config['num_train'][0] / config['num_models'])
-                cmd.extend(['--test_size', str(max(0.1, min(0.3, test_ratio)))])
+                cmd.extend(['--train_size', str(config['num_train'][0])])
             
             # 损失函数权重
             cmd.extend(['--lambda_mse', str(config.get('lambda_mse', 1.0))])
@@ -275,6 +282,10 @@ def start_analysis(config):
             
             # 输出目录
             cmd.extend(['--output_dir', config['output_dir']])
+            
+            # 自定义运行名称
+            if config.get('run_name') and config['run_name'].strip():
+                cmd.extend(['--run_name', config['run_name'].strip()])
         else:
             # POD/AE分析命令
             cmd = run_analysis_command(config)
@@ -346,6 +357,33 @@ def stop_analysis():
 
 def unet_detail_config(config):
     """UNet详细配置界面"""
+    
+    # 数据参数配置
+    st.markdown("#### 📊 数据参数")
+    data_col1, data_col2 = st.columns(2)
+    
+    with data_col1:
+        config['num_models'] = st.number_input(
+            "使用模型数量", 
+            min_value=10, 
+            max_value=100, 
+            value=config.get('num_models', 80),
+            help="用于训练的模型总数量"
+        )
+        
+    with data_col2:
+        st.info("📡 训练频率和训练集大小由左侧栏统一设置")
+        st.success("✅ UNet现已支持多频率训练 (1.5G + 3G)")
+    
+    # 自定义运行名称
+    st.markdown("#### 📁 运行配置")
+    config['run_name'] = st.text_input(
+        "自定义运行名称", 
+        value=config.get('run_name', ''),
+        placeholder="输入自定义运行名称 (留空使用时间戳)",
+        help="自定义名称将用作输出文件夹名称，如: my_experiment"
+    )
+    
     st.markdown("#### 🏋️ 训练参数")
     col1, col2, col3 = st.columns(3)
     
@@ -399,39 +437,53 @@ def unet_detail_config(config):
     col4, col5, col6, col7 = st.columns(4)
     
     with col4:
-        config['lambda_mse'] = st.number_input(
+        config['lambda_mse'] = st.text_input(
             "MSE权重", 
-            min_value=0.1, 
-            max_value=10.0, 
-            value=config.get('lambda_mse', 1.0)
+            value=str(config.get('lambda_mse', 1.0)),
+            help="输入数值，如: 1.0"
         )
+        # 转换为float
+        try:
+            config['lambda_mse'] = float(config['lambda_mse'])
+        except:
+            config['lambda_mse'] = 1.0
+            st.error("MSE权重必须是数字")
     
     with col5:
-        config['lambda_smooth'] = st.number_input(
+        config['lambda_smooth'] = st.text_input(
             "平滑权重", 
-            min_value=0.001, 
-            max_value=1.0, 
-            value=config.get('lambda_smooth', 0.01),
-            format="%.3f"
+            value=str(config.get('lambda_smooth', 0.01)),
+            help="输入数值，如: 0.01"
         )
+        try:
+            config['lambda_smooth'] = float(config['lambda_smooth'])
+        except:
+            config['lambda_smooth'] = 0.01
+            st.error("平滑权重必须是数字")
     
     with col6:
-        config['lambda_physics'] = st.number_input(
+        config['lambda_physics'] = st.text_input(
             "物理权重", 
-            min_value=0.001, 
-            max_value=1.0, 
-            value=config.get('lambda_physics', 0.05),
-            format="%.3f"
+            value=str(config.get('lambda_physics', 0.05)),
+            help="输入数值，如: 0.05"
         )
+        try:
+            config['lambda_physics'] = float(config['lambda_physics'])
+        except:
+            config['lambda_physics'] = 0.05
+            st.error("物理权重必须是数字")
     
     with col7:
-        config['lambda_multiscale'] = st.number_input(
+        config['lambda_multiscale'] = st.text_input(
             "多尺度权重", 
-            min_value=0.001, 
-            max_value=1.0, 
-            value=config.get('lambda_multiscale', 0.1),
-            format="%.3f"
+            value=str(config.get('lambda_multiscale', 0.1)),
+            help="输入数值，如: 0.1"
         )
+        try:
+            config['lambda_multiscale'] = float(config['lambda_multiscale'])
+        except:
+            config['lambda_multiscale'] = 0.1
+            st.error("多尺度权重必须是数字")
 
 def main():
     """主函数"""
@@ -517,11 +569,6 @@ def main():
         config['ae_enabled'] = st.sidebar.checkbox("启用Autoencoder分析", value=config.get('ae_enabled', True))
         config['skip_ae_training'] = st.sidebar.checkbox("跳过AE重训练", value=config.get('skip_ae_training', False))
     
-    # 保存配置
-    if st.sidebar.button("💾 保存所有配置"):
-        config_filename = "unet_config.json" if selected_method == "FiLM-UNet训练" else "streamlit_config.json"
-        save_config(config, config_filename)
-        st.sidebar.success("所有配置已保存!")
     
     # 主界面详细配置部分
     st.markdown("---")
@@ -604,6 +651,22 @@ def main():
             # FiLM-UNet详细配置
             unet_detail_config(config)
         
+        # 配置保存命名
+        st.markdown("---")
+        st.markdown("#### 📝 配置保存设置")
+        naming_col1, naming_col2 = st.columns([2, 1])
+        
+        with naming_col1:
+            custom_config_name = st.text_input(
+                "自定义配置文件名", 
+                value="",
+                placeholder="输入自定义配置名称 (留空使用默认)",
+                help="输入自定义名称将保存为 '{name}_config.json'"
+            )
+        
+        with naming_col2:
+            timestamp_suffix = st.checkbox("添加时间戳", value=False, help="在文件名后添加时间戳")
+        
         # 控制按钮
         st.markdown("---")
         control_col1, control_col2, control_col3 = st.columns(3)
@@ -634,17 +697,42 @@ def main():
                 st.button("⏹️ 停止分析", disabled=True, use_container_width=True)
         
         with control_col3:
-            config_filename = "unet_config.json" if selected_method == "FiLM-UNet训练" else "streamlit_config.json"
             if st.button("💾 保存详细配置", use_container_width=True):
+                # 构建配置文件名
+                if custom_config_name.strip():
+                    # 使用自定义名称
+                    base_name = custom_config_name.strip()
+                    # 移除可能的.json后缀
+                    if base_name.endswith('.json'):
+                        base_name = base_name[:-5]
+                else:
+                    # 使用默认名称
+                    base_name = "unet_config" if selected_method == "FiLM-UNet训练" else "streamlit_config"
+                
+                # 添加时间戳 (如果选择)
+                if timestamp_suffix:
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    config_filename = f"{base_name}_{timestamp}_config.json"
+                else:
+                    config_filename = f"{base_name}_config.json"
+                
                 save_config(config, config_filename)
-                st.success("✅ 详细配置已保存!")
+                st.success(f"✅ 详细配置已保存为: {config_filename}")
     
     with main_col2:
         # 实时日志显示
         st.markdown("#### 📋 实时日志")
         
         if st.session_state.analysis_running:
-            update_logs_from_queue()
+            process_status = update_logs_from_queue()
+            # 检查进程是否结束
+            if process_status is not None:
+                st.session_state.analysis_running = False
+                if process_status == 0:
+                    st.success("✅ 分析完成！")
+                else:
+                    st.error(f"❌ 分析失败，返回码: {process_status}")
+                st.rerun()
         
         # 日志控制
         log_col1, log_col2, log_col3 = st.columns(3)
